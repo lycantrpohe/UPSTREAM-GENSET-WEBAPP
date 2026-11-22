@@ -1,0 +1,2468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EngineSpec Pro — Genset Build, Fastener &amp; Spec Manager</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <style>
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .scrollbar-thin::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 9999px;
+    }
+    .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-900 min-h-screen flex flex-col">
+
+  <!-- Top Bar -->
+  <header class="bg-slate-900 text-white border-b border-slate-800 sticky top-0 z-30">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-2.5 sm:gap-3">
+        <button id="homeBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-100 text-xs sm:text-sm font-semibold transition shadow-xs" title="Go to Home Overview">
+          <i data-lucide="home" class="w-4 h-4 text-amber-400"></i>
+          <span>Home</span>
+        </button>
+
+        <div class="flex items-center gap-2.5">
+          <div class="w-9 h-9 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center font-bold shadow-sm">
+            <i data-lucide="wrench" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h1 class="text-base sm:text-lg font-bold tracking-tight leading-tight">EngineSpec Pro</h1>
+            <p class="text-xs text-slate-400 hidden sm:block">Genset Build Guide — Fasteners, Electrical, Issues &amp; Specs</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Account & Access Controls -->
+      <div class="flex items-center gap-2 sm:gap-3 flex-wrap">
+        <button id="openAuthModalBtn" type="button" class="inline-flex items-center gap-2 bg-slate-800/90 hover:bg-slate-700 border border-slate-700 rounded-lg px-3 py-1.5 text-xs sm:text-sm font-medium text-white transition">
+          <i data-lucide="user-check" class="w-4 h-4 text-amber-400 shrink-0"></i>
+          <span id="activeUserLabel" class="truncate max-w-[140px]">Owner (Admin)</span>
+          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+        </button>
+
+        <button id="openUsersModalBtn" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <i data-lucide="users" class="w-4 h-4 text-sky-400"></i>
+          <span class="hidden sm:inline">Access Roles</span>
+        </button>
+
+        <button id="openAuditModalBtn" type="button" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-medium text-slate-200 transition">
+          <i data-lucide="history" class="w-4 h-4 text-emerald-400"></i>
+          <span class="hidden sm:inline">System Log</span>
+          <span id="auditCountBadge" class="bg-slate-700 text-slate-200 px-1.5 py-0.5 rounded-full text-[10px] font-semibold">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Role Permissions Banner -->
+    <div id="roleBanner" class="bg-slate-800/70 border-t border-slate-700/80 px-3 sm:px-6 py-1.5 text-xs">
+      <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div class="flex items-center gap-2" id="roleBannerText"></div>
+        <div class="flex items-center gap-3 text-slate-400">
+          <span class="inline-flex items-center gap-1">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            System-Wide Sync Active
+          </span>
+          <button id="resetDemoBtn" type="button" class="text-slate-400 hover:text-white underline transition">Reset Demo</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <div class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-5 flex flex-col lg:flex-row gap-5 relative">
+
+    <!-- Sidebar: Genset / Engine Directory -->
+    <aside id="engineSidebar" class="hidden lg:flex flex-col w-full lg:w-72 shrink-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden self-start lg:sticky lg:top-28">
+      <div class="p-4 border-b border-slate-200 bg-slate-50/70">
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+            <i data-lucide="cpu" class="w-4 h-4 text-slate-600"></i>
+            Gensets / Engines
+          </h2>
+          <button id="addEngineBtn" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+            <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+            Add
+          </button>
+        </div>
+        <div class="relative">
+          <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-2.5"></i>
+          <input id="engineSearchInput" type="text" placeholder="Search gensets..." class="w-full pl-8 pr-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        </div>
+      </div>
+      <div id="engineListContainer" class="divide-y divide-slate-100 max-h-[60vh] overflow-y-auto scrollbar-thin">
+      </div>
+    </aside>
+
+    <!-- Main Workspace -->
+    <main class="flex-1 min-w-0 flex flex-col gap-5" id="mainWorkspace">
+    </main>
+  </div>
+
+  <!-- Sign In / Switch Account Modal -->
+  <div id="authModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">Sign In / Switch Account</h3>
+          <p class="text-xs text-slate-500">New Google or Email logins start as <strong>Viewer</strong> (read-only) until promoted by Admin.</p>
+        </div>
+        <button type="button" class="closeModalBtn p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60" data-modal="authModal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 space-y-5 max-h-[82vh] overflow-y-auto scrollbar-thin">
+        <!-- Admin PIN Login -->
+        <div class="p-3.5 rounded-xl border border-amber-200 bg-amber-50/60 space-y-2.5">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-900 flex items-center gap-1.5">
+              <i data-lucide="crown" class="w-4 h-4 text-amber-600"></i>
+              Admin Access (PIN Protected)
+            </span>
+            <span class="text-[11px] text-amber-700">Default PIN: <strong>1234</strong></span>
+          </div>
+          <form id="adminLoginForm" class="flex gap-2">
+            <input id="adminPinInput" type="password" inputmode="numeric" placeholder="Enter Admin PIN" required class="flex-1 px-3 py-1.5 text-sm bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+            <button type="submit" class="px-3.5 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold transition">Sign In as Admin</button>
+          </form>
+        </div>
+
+        <!-- Google / Email Sign In -->
+        <form id="externalLoginForm" class="space-y-3 border-t border-slate-200 pt-4">
+          <div class="text-xs font-bold text-slate-700 uppercase tracking-wider">Sign In with Google or Email (Starts as Viewer)</div>
+          <div>
+            <label for="loginNameInput" class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+            <input id="loginNameInput" type="text" required placeholder="e.g., Alex Rivera" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+          <div>
+            <label for="loginEmailInput" class="block text-xs font-semibold text-slate-700 mb-1">Email Address *</label>
+            <input id="loginEmailInput" type="email" required placeholder="alex@gmail.com" class="w-full px-3 py-1.5 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button type="submit" data-provider="google" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-white hover:bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold shadow-xs transition">
+              <i data-lucide="globe" class="w-4 h-4 text-sky-600"></i>
+              Continue with Google
+            </button>
+            <button type="submit" data-provider="email" class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold shadow-xs transition">
+              <i data-lucide="mail" class="w-4 h-4"></i>
+              Sign In with Email
+            </button>
+          </div>
+        </form>
+
+        <!-- Existing Non-Admin Accounts Quick Switch -->
+        <div class="border-t border-slate-200 pt-4">
+          <div class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Existing Team Accounts</div>
+          <div id="authUserQuickList" class="space-y-1.5"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add / Edit Genset / Engine Modal -->
+  <div id="engineModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <h3 id="engineModalTitle" class="text-base font-bold text-slate-900">Add New Genset / Engine</h3>
+        <button type="button" class="closeModalBtn p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60" data-modal="engineModal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="engineForm" class="p-5 space-y-4">
+        <input type="hidden" id="editEngineId" value="" />
+        <div>
+          <label for="engineNameInput" class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Genset / Engine Model *</label>
+          <input id="engineNameInput" type="text" required placeholder="e.g., Cummins 150kW Diesel Genset" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label for="engineCodeInput" class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Engine / Spec Code</label>
+            <input id="engineCodeInput" type="text" placeholder="e.g., QSB7 • 60Hz 480V" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+          <div>
+            <label for="engineAppInput" class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Build Type / Duty</label>
+            <input id="engineAppInput" type="text" placeholder="e.g., Skid-Mounted Standby" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" class="closeModalBtn px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100" data-modal="engineModal">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-sm">Save Genset</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add / Edit Sub-Category Modal -->
+  <div id="categoryModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-md overflow-hidden">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <h3 id="categoryModalTitle" class="text-base font-bold text-slate-900">Add Sub-Category</h3>
+        <button type="button" class="closeModalBtn p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60" data-modal="categoryModal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <form id="categoryForm" class="p-5 space-y-4">
+        <input type="hidden" id="editCategoryId" value="" />
+        <div>
+          <label for="categoryNameInput" class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Sub-Category Name *</label>
+          <input id="categoryNameInput" type="text" required placeholder="e.g., Skid &amp; Enclosure Bolts, Control Panel Wiring" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        </div>
+        <div id="categoryTypeWrapper">
+          <label for="categoryTypeInput" class="block text-xs font-semibold text-slate-700 uppercase tracking-wide mb-1">Category Layout Type</label>
+          <select id="categoryTypeInput" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500">
+            <option value="bolts">Bolt / Hardware List (Bolt Name, Size, Qty, Washer)</option>
+            <option value="electrical">Electrical / Wiring (Component, Spec, Connector, Notes)</option>
+            <option value="issues">Issues &amp; Fixes (Symptom, Verified Fix, Status, Photo)</option>
+            <option value="notes">Other Specifications / Notes</option>
+            <option value="photos">Photo Gallery</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-end gap-2 pt-2">
+          <button type="button" class="closeModalBtn px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100" data-modal="categoryModal">Cancel</button>
+          <button type="submit" class="px-4 py-2 rounded-lg text-sm font-semibold bg-sky-600 hover:bg-sky-700 text-white shadow-sm">Save Category</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Confirmation Modal -->
+  <div id="confirmModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-sm overflow-hidden">
+      <div class="p-5">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+            <i data-lucide="alert-triangle" class="w-5 h-5"></i>
+          </div>
+          <div>
+            <h3 id="confirmModalTitle" class="text-base font-bold text-slate-900">Confirm Action</h3>
+            <p id="confirmModalMessage" class="text-sm text-slate-600 mt-1"></p>
+          </div>
+        </div>
+        <div class="flex items-center justify-end gap-2 mt-5">
+          <button id="confirmCancelBtn" type="button" class="px-4 py-2 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-100">Cancel</button>
+          <button id="confirmProceedBtn" type="button" class="px-4 py-2 rounded-lg text-sm font-semibold bg-rose-600 hover:bg-rose-700 text-white">Confirm</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Photo Lightbox Modal -->
+  <div id="photoLightboxModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/85 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden">
+      <div class="px-4 py-3 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h4 id="lightboxTitle" class="text-sm font-bold text-slate-900">Photo Preview</h4>
+          <p id="lightboxMeta" class="text-xs text-slate-500"></p>
+        </div>
+        <button type="button" class="closeModalBtn p-1 rounded-lg text-slate-500 hover:text-slate-800 hover:bg-slate-200" data-modal="photoLightboxModal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="bg-slate-900 flex items-center justify-center max-h-[75vh] overflow-hidden p-2">
+        <img id="lightboxImg" src="" alt="Genset build photo" class="max-h-[70vh] max-w-full object-contain rounded-lg" />
+      </div>
+    </div>
+  </div>
+
+  <!-- Users & Access Roles Modal -->
+  <div id="usersModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[88vh]">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">User Access Levels &amp; Permissions</h3>
+          <p class="text-xs text-slate-500">Only Admin can promote Viewers to Editor or Admin, or change the Admin PIN.</p>
+        </div>
+        <button type="button" class="closeModalBtn p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60" data-modal="usersModal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div class="p-5 overflow-y-auto space-y-5 scrollbar-thin">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div class="p-3 rounded-xl border border-amber-200 bg-amber-50/70">
+            <div class="font-bold text-amber-900 flex items-center gap-1.5 mb-1">
+              <i data-lucide="crown" class="w-3.5 h-3.5"></i> Admin
+            </div>
+            <p class="text-amber-800 leading-relaxed">Full control: add/delete gensets &amp; sub-categories, lock/unlock lists, edit all specs, and promote/demote users.</p>
+          </div>
+          <div class="p-3 rounded-xl border border-sky-200 bg-sky-50/70">
+            <div class="font-bold text-sky-900 flex items-center gap-1.5 mb-1">
+              <i data-lucide="pencil" class="w-3.5 h-3.5"></i> Editor
+            </div>
+            <p class="text-sky-800 leading-relaxed">Can edit unlocked bolt lists, electrical specs, issues &amp; fixes, Other Specifications, and photos. Cannot manage users or delete gensets.</p>
+          </div>
+          <div class="p-3 rounded-xl border border-slate-200 bg-slate-50">
+            <div class="font-bold text-slate-800 flex items-center gap-1.5 mb-1">
+              <i data-lucide="eye" class="w-3.5 h-3.5"></i> Viewer (Default)
+            </div>
+            <p class="text-slate-600 leading-relaxed">Read-only access. All new Google or Email logins start here until an Admin grants Editor or Admin access.</p>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-xs font-bold text-slate-700 uppercase tracking-wider mb-2">Registered Users</h4>
+          <div id="usersListContainer" class="divide-y divide-slate-200 border border-slate-200 rounded-xl overflow-hidden"></div>
+        </div>
+
+        <!-- Admin-only: Pre-register user & Update PIN -->
+        <div id="adminUserControls" class="space-y-3">
+          <form id="addUserForm" class="p-3.5 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+            <div class="sm:col-span-4">
+              <label for="newUserName" class="block text-xs font-semibold text-slate-700 mb-1">Add Team Member</label>
+              <input id="newUserName" type="text" placeholder="Name (e.g., Devon)" class="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+            </div>
+            <div class="sm:col-span-4">
+              <label for="newUserEmail" class="block text-xs font-semibold text-slate-700 mb-1">Email</label>
+              <input id="newUserEmail" type="email" placeholder="devon@shop.com" class="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+            </div>
+            <div class="sm:col-span-2">
+              <label for="newUserRole" class="block text-xs font-semibold text-slate-700 mb-1">Access</label>
+              <select id="newUserRole" class="w-full px-2 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                <option value="viewer" selected>Viewer</option>
+                <option value="editor">Editor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2">
+              <button type="submit" id="addUserSubmitBtn" class="w-full px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold transition">Add</button>
+            </div>
+          </form>
+
+          <form id="changePinForm" class="p-3.5 bg-amber-50/50 border border-amber-200 rounded-xl flex flex-wrap items-center justify-between gap-2">
+            <div class="text-xs text-amber-900 font-semibold">Admin PIN (for switching to Admin)</div>
+            <div class="flex items-center gap-2">
+              <input id="newAdminPinInput" type="password" inputmode="numeric" placeholder="New PIN" class="w-32 px-2.5 py-1 text-sm bg-white border border-amber-300 rounded-lg" />
+              <button type="submit" class="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-xs font-bold">Update PIN</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Global System Change Log Modal -->
+  <div id="auditModal" class="fixed inset-0 z-50 hidden items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4">
+    <div class="bg-white rounded-2xl shadow-xl border border-slate-200 w-full max-w-2xl overflow-hidden flex flex-col max-h-[85vh]">
+      <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="text-base font-bold text-slate-900">System-Wide Change Log</h3>
+          <p class="text-xs text-slate-500">Every edit to gensets, sub-categories, bolts, electrical, issues, photos, or specs updates the whole system.</p>
+        </div>
+        <button type="button" class="closeModalBtn p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-200/60" data-modal="auditModal">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+      <div id="auditLogContainer" class="p-5 overflow-y-auto space-y-2.5 scrollbar-thin"></div>
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toastContainer" class="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <script>
+    // =========================================================================
+    // CLOUD SYNC CONFIGURATION (Fill in before uploading to GitHub Pages)
+    // =========================================================================
+    const ADMIN_EMAIL = 'manoralph@gmail.com'; // e.g., 'yourname@gmail.com'
+    const FIREBASE_CONFIG = {
+      apiKey: 'AIzaSyCOK7Pv1sYpaCCPwzaObRUEMo6zgROXgy0',
+      authDomain: 'genset-specs.firebaseapp.com',
+      projectId: 'genset-specs',
+      storageBucket: 'genset-specs.firebasestorage.app',
+      messagingSenderId: '854863925485',
+      appId: '1:854863925485:web:79514abdb5a75ce0567ce4'
+    };
+
+    const STORAGE_KEY = 'enginespec_pro_state_v4';
+
+    const ROLE_META = {
+      admin: {
+        label: 'Admin',
+        badgeClass: 'bg-amber-500/20 text-amber-300 border-amber-400/40',
+        lightBadge: 'bg-amber-100 text-amber-800 border-amber-300',
+        desc: 'Full control: add/delete gensets & sub-categories, lock/unlock specs, edit all items, and manage user access levels.'
+      },
+      editor: {
+        label: 'Editor',
+        badgeClass: 'bg-sky-500/20 text-sky-300 border-sky-400/40',
+        lightBadge: 'bg-sky-100 text-sky-800 border-sky-300',
+        desc: 'Editor: can edit unlocked bolt lists, electrical specs, issues & fixes, Other Specifications, and photos.'
+      },
+      viewer: {
+        label: 'Viewer',
+        badgeClass: 'bg-slate-500/30 text-slate-300 border-slate-400/40',
+        lightBadge: 'bg-slate-100 text-slate-700 border-slate-300',
+        desc: 'Read-only: you can view all genset specs, bolts, electrical, issues & photos. Ask Admin for Editor access.'
+      }
+    };
+
+    const CATEGORY_META = {
+      bolts: { icon: 'list-checks', color: 'sky' },
+      electrical: { icon: 'zap', color: 'amber' },
+      issues: { icon: 'wrench', color: 'rose' },
+      notes: { icon: 'clipboard-list', color: 'emerald' },
+      photos: { icon: 'camera', color: 'indigo' }
+    };
+
+    const WASHER_TYPES = [
+      'Hardened Flat (AN960)',
+      'Split Lock',
+      'Flange / Integrated',
+      'Bellville / Conical',
+      'Copper Crush',
+      'Nylon / Sealing',
+      'None'
+    ];
+
+    function getDefaultState() {
+      return {
+        currentUserId: 'u1',
+        adminPin: '1234',
+        currentView: 'engine',
+        selectedEngineId: 'gs1',
+        users: [
+          { id: 'u1', name: 'Owner', email: 'owner@shop.local', provider: 'admin', role: 'admin' },
+          { id: 'u2', name: 'Sample Tech', email: 'tech@gmail.com', provider: 'google', role: 'viewer' }
+        ],
+        engines: [
+          {
+            id: 'gs1',
+            name: 'Cummins 150kW Diesel Genset',
+            code: 'QSB7 • 60Hz 480V 3-Phase',
+            application: 'Skid-Mounted Standby Build',
+            updatedAt: 'Today, 09:15 AM',
+            selectedCategoryId: 'cat1',
+            categories: [
+              {
+                id: 'cat1',
+                name: 'Bolt List',
+                type: 'bolts',
+                locked: true,
+                lockedBy: 'Owner',
+                items: [
+                  { id: 'b1', name: 'Skid Isolation Mount Bolt', size: '5/8"-11 x 2.50"', qty: 8, washer: 'Hardened Flat (AN960)', locked: true },
+                  { id: 'b2', name: 'Alternator Coupling Bolt', size: 'M10 x 1.5 x 35mm', qty: 12, washer: 'Split Lock', locked: true },
+                  { id: 'b3', name: 'Bellhousing / Flywheel Housing Bolt', size: 'M12 x 1.75 x 45mm', qty: 12, washer: 'Hardened Flat (AN960)', locked: false },
+                  { id: 'b4', name: 'Exhaust Flex Flange Bolt', size: '3/8"-16 x 1.75"', qty: 8, washer: 'Bellville / Conical', locked: false },
+                  { id: 'b5', name: 'Radiator Support Bracket Bolt', size: 'M10 x 1.5 x 30mm', qty: 6, washer: 'Flange / Integrated', locked: false }
+                ]
+              },
+              {
+                id: 'cat2',
+                name: 'Electrical',
+                type: 'electrical',
+                locked: false,
+                items: [
+                  { id: 'el1', component: 'AVR Sensing & Excitation', spec: '120/240V AC Sensing (16 AWG)', connector: '12-Pin Deutsch DT', notes: 'Verify jumper for 480V Wye configuration before load test.', locked: true },
+                  { id: 'el2', component: 'Block Heater Supply', spec: '120V AC / 1500W (12 AWG)', connector: 'NEMA 5-15P / Junction Box', notes: 'Mount below lower radiator hose level to prevent air pocket.', locked: false },
+                  { id: 'el3', component: 'Battery Charger & DC Control', spec: '24V DC / 10A Float', connector: 'Ring Terminals (#10 Stud)', notes: 'Connect directly to battery side of disconnect switch.', locked: false }
+                ]
+              },
+              {
+                id: 'cat3',
+                name: 'Issues & Fixes',
+                type: 'issues',
+                items: [
+                  { id: 'is1', title: 'Voltage hunting at no-load (480V)', symptom: 'Generator output oscillates +/- 8V at 1800 RPM no-load', fix: 'Adjust AVR stability trim pot 1/4 turn clockwise and confirm magnetic pickup (MPU) gap is 0.025" from flywheel ring gear.', status: 'Resolved', author: 'Owner', timestamp: 'Yesterday, 03:20 PM', photo: null }
+                ]
+              },
+              {
+                id: 'cat4',
+                name: 'Other Specifications',
+                type: 'notes',
+                items: [
+                  { id: 'qn1', tag: 'Quality Standard', title: 'Load Bank & Megger Test Spec', body: 'Perform 1000V megger test on stator windings (>100 MOhm) before first crank. Run 2-hour stepped load bank test (25% / 50% / 75% / 100%) and log coolant temp.', author: 'Owner', timestamp: 'Today, 09:14 AM' },
+                  { id: 'qn2', tag: 'Fluid / Fill Spec', title: 'Coolant & Lube Oil Capacity', body: 'Fill with 50/50 ELC heavy-duty coolant (6.5 gal) and 15W-40 CJ-4/CK-4 diesel oil (4.8 gal). Pressure-test cooling system to 15 PSI.', author: 'Owner', timestamp: 'Yesterday, 04:40 PM' }
+                ]
+              },
+              {
+                id: 'cat5',
+                name: 'Photos',
+                type: 'photos',
+                items: []
+              }
+            ]
+          },
+          {
+            id: 'gs2',
+            name: 'CAT C9 250kW Genset',
+            code: 'C9 ACERT • 60Hz 600V',
+            application: 'Sound-Attenuated Enclosure',
+            updatedAt: 'Yesterday, 02:10 PM',
+            selectedCategoryId: 'cat6',
+            categories: [
+              {
+                id: 'cat6',
+                name: 'Bolt List',
+                type: 'bolts',
+                locked: false,
+                lockedBy: null,
+                items: [
+                  { id: 'b6', name: 'Base Frame Sub-Tank Bolt', size: '3/4"-10 x 2.75"', qty: 10, washer: 'Hardened Flat (AN960)', locked: true },
+                  { id: 'b7', name: 'Generator End Drive Disc Bolt', size: 'M12 x 1.75 x 35mm', qty: 12, washer: 'Hardened Flat (AN960)', locked: false },
+                  { id: 'b8', name: 'Enclosure Louver Panel Bolt', size: 'M8 x 1.25 x 25mm', qty: 24, washer: 'Nylon / Sealing', locked: false }
+                ]
+              },
+              {
+                id: 'cat7',
+                name: 'Electrical',
+                type: 'electrical',
+                locked: false,
+                items: [
+                  { id: 'el4', component: 'EMCP Control Harness', spec: '24V DC CAN J1939 (Shielded)', connector: '70-Pin ECM Plug', notes: 'Ensure 120-ohm terminating resistor is installed at controller end.', locked: false }
+                ]
+              },
+              {
+                id: 'cat8',
+                name: 'Issues & Fixes',
+                type: 'issues',
+                items: []
+              },
+              {
+                id: 'cat9',
+                name: 'Other Specifications',
+                type: 'notes',
+                items: [
+                  { id: 'qn3', tag: 'Alignment Check', title: 'Coupling Runout Tolerance', body: 'Check flywheel face and pilot bore runout with dial indicator — max 0.004" TIR before torquing drive disc.', author: 'Owner', timestamp: 'Yesterday, 02:10 PM' }
+                ]
+              },
+              {
+                id: 'cat10',
+                name: 'Photos',
+                type: 'photos',
+                items: []
+              }
+            ]
+          }
+        ],
+        auditLog: [
+          { id: 'a1', user: 'Owner', role: 'admin', action: 'Locked Bolt List on Cummins 150kW Diesel Genset', time: 'Today, 09:15 AM' }
+        ]
+      };
+    }
+
+    let state = loadState();
+    let editingRowId = null;
+    let boltSearchQuery = '';
+    let engineSearchQuery = '';
+    let confirmCallback = null;
+
+    function loadState() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && Array.isArray(parsed.engines) && Array.isArray(parsed.users)) {
+            return parsed;
+          }
+        }
+      } catch (e) {}
+      return getDefaultState();
+    }
+
+    function saveState(auditAction = null) {
+      if (auditAction) {
+        const user = getCurrentUser();
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        state.auditLog.unshift({
+          id: 'a_' + Date.now(),
+          user: user.name,
+          role: user.role,
+          action: auditAction,
+          time: 'Today, ' + nowStr
+        });
+        if (state.auditLog.length > 60) state.auditLog.pop();
+
+        const eng = getSelectedEngine();
+        if (eng) eng.updatedAt = 'Today, ' + nowStr;
+      }
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (e) {
+        showToast('Storage full — try removing large photos', 'warn');
+      }
+      if (cloudDb) {
+        cloudDb.collection('shop').doc('enginespec').set({
+          engines: state.engines,
+          users: state.users,
+          auditLog: state.auditLog,
+          adminPin: state.adminPin
+        }, { merge: true }).catch(() => {});
+      }
+    }
+
+    function getCurrentUser() {
+      return state.users.find(u => u.id === state.currentUserId) || state.users[0];
+    }
+
+    function getSelectedEngine() {
+      return state.engines.find(e => e.id === state.selectedEngineId) || state.engines[0] || null;
+    }
+
+    function getSelectedCategory(engine) {
+      if (!engine || !engine.categories || engine.categories.length === 0) return null;
+      return engine.categories.find(c => c.id === engine.selectedCategoryId) || engine.categories[0];
+    }
+
+    // Strict Access Level Helpers
+    function isAdmin() {
+      return getCurrentUser().role === 'admin';
+    }
+
+    function canManageSystem() {
+      return isAdmin();
+    }
+
+    function canLockToggle() {
+      return isAdmin();
+    }
+
+    function canEditContent() {
+      const role = getCurrentUser().role;
+      return role === 'admin' || role === 'editor';
+    }
+
+    function canEditBoltRow(cat, bolt) {
+      if (!canEditContent() || !cat) return false;
+      return !cat.locked && !(bolt && bolt.locked);
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function showToast(message, type = 'success') {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      const colors = type === 'error'
+        ? 'bg-rose-900 text-rose-100 border-rose-700'
+        : type === 'warn'
+        ? 'bg-amber-900 text-amber-100 border-amber-700'
+        : 'bg-slate-900 text-white border-slate-700';
+      toast.className = `pointer-events-auto flex items-center gap-2 px-4 py-2.5 rounded-xl border shadow-lg text-xs sm:text-sm font-medium transition-all ${colors}`;
+      toast.innerHTML = `<i data-lucide="${type === 'error' ? 'alert-circle' : type === 'warn' ? 'lock' : 'check-circle-2'}" class="w-4 h-4 shrink-0"></i><span>${escapeHtml(message)}</span>`;
+      container.appendChild(toast);
+      lucide.createIcons({ root: toast });
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(6px)';
+        setTimeout(() => toast.remove(), 250);
+      }, 2800);
+    }
+
+    function openConfirm(title, message, onConfirm) {
+      document.getElementById('confirmModalTitle').textContent = title;
+      document.getElementById('confirmModalMessage').textContent = message;
+      confirmCallback = onConfirm;
+      openModal('confirmModal');
+    }
+
+    function closeModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    function openModal(id) {
+      const modal = document.getElementById(id);
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function compressImageFile(file, maxWidth = 900, quality = 0.78) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            const scale = Math.min(1, maxWidth / img.width);
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(img.width * scale);
+            canvas.height = Math.round(img.height * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+          };
+          img.onerror = reject;
+          img.src = ev.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function renderAll() {
+      renderHeader();
+      renderSidebar();
+      renderWorkspace();
+      lucide.createIcons();
+    }
+
+    function renderHeader() {
+      const user = getCurrentUser();
+      const roleInfo = ROLE_META[user.role] || ROLE_META.viewer;
+
+      const homeBtn = document.getElementById('homeBtn');
+      if (state.currentView === 'home') {
+        homeBtn.classList.add('ring-2', 'ring-amber-400', 'bg-slate-700');
+      } else {
+        homeBtn.classList.remove('ring-2', 'ring-amber-400', 'bg-slate-700');
+      }
+
+      document.getElementById('activeUserLabel').textContent = `${user.name} (${roleInfo.label})`;
+      document.getElementById('auditCountBadge').textContent = state.auditLog.length;
+
+      document.getElementById('roleBannerText').innerHTML = `
+        <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md border text-[11px] font-semibold ${roleInfo.badgeClass}">
+          ${escapeHtml(roleInfo.label)}
+        </span>
+        <span class="text-slate-300">${escapeHtml(roleInfo.desc)}</span>
+      `;
+
+      const addEngineBtn = document.getElementById('addEngineBtn');
+      addEngineBtn.disabled = !canManageSystem();
+      addEngineBtn.title = canManageSystem() ? 'Add a new genset / engine build' : 'Only Admin can add gensets';
+    }
+
+    function renderSidebar() {
+      const container = document.getElementById('engineListContainer');
+      const q = engineSearchQuery.trim().toLowerCase();
+      const filtered = state.engines.filter(e =>
+        e.name.toLowerCase().includes(q) ||
+        (e.code && e.code.toLowerCase().includes(q)) ||
+        (e.application && e.application.toLowerCase().includes(q))
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-sm text-slate-500">No gensets match your search.</div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(eng => {
+        const isSelected = state.currentView === 'engine' && eng.id === state.selectedEngineId;
+        const cats = eng.categories || [];
+        const boltCats = cats.filter(c => c.type === 'bolts');
+        const totalBolts = boltCats.reduce((s, c) => s + c.items.reduce((bs, b) => bs + (Number(b.qty) || 0), 0), 0);
+        const anyLocked = boltCats.some(c => c.locked);
+
+        return `
+          <button type="button" data-select-engine="${escapeHtml(eng.id)}"
+            class="w-full text-left p-3.5 transition flex items-start justify-between gap-2 ${isSelected ? 'bg-sky-50 border-l-4 border-l-sky-600' : 'hover:bg-slate-50 border-l-4 border-l-transparent'}">
+            <div class="min-w-0">
+              <div class="font-semibold text-sm text-slate-900 truncate">${escapeHtml(eng.name)}</div>
+              <div class="text-xs text-slate-500 truncate mt-0.5">${escapeHtml(eng.code || 'Custom Spec')}</div>
+              <div class="flex flex-wrap items-center gap-1.5 mt-2 text-[11px] text-slate-500">
+                <span class="bg-slate-100 px-1.5 py-0.5 rounded font-medium">${cats.length} categories</span>
+                <span class="bg-slate-100 px-1.5 py-0.5 rounded font-medium">${totalBolts} bolts</span>
+              </div>
+            </div>
+            <span class="shrink-0 mt-0.5 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold ${anyLocked ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}">
+              <i data-lucide="${anyLocked ? 'lock' : 'unlock'}" class="w-3 h-3"></i>
+            </span>
+          </button>
+        `;
+      }).join('');
+    }
+
+    function renderWorkspace() {
+      const main = document.getElementById('mainWorkspace');
+      if (state.currentView === 'home') {
+        renderHomeView(main);
+        return;
+      }
+
+      const engine = getSelectedEngine();
+      if (!engine) {
+        renderHomeView(main);
+        return;
+      }
+
+      const admin = isAdmin();
+      const canEdit = canEditContent();
+      const cats = engine.categories || [];
+      const activeCat = getSelectedCategory(engine);
+
+      main.innerHTML = `
+        <!-- Genset Header Card -->
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-4 sm:p-5">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-xl sm:text-2xl font-bold text-slate-900">${escapeHtml(engine.name)}</h2>
+                <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+                  ${cats.length} Sub-Categor${cats.length === 1 ? 'y' : 'ies'}
+                </span>
+              </div>
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs sm:text-sm text-slate-500 mt-1.5">
+                ${engine.code ? `<span class="flex items-center gap-1"><i data-lucide="hash" class="w-3.5 h-3.5"></i> ${escapeHtml(engine.code)}</span>` : ''}
+                ${engine.application ? `<span class="flex items-center gap-1"><i data-lucide="gauge" class="w-3.5 h-3.5"></i> ${escapeHtml(engine.application)}</span>` : ''}
+                <span class="flex items-center gap-1"><i data-lucide="clock" class="w-3.5 h-3.5"></i> Updated: ${escapeHtml(engine.updatedAt)}</span>
+              </div>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              ${admin ? `
+                <button id="editEngineInfoBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 transition">
+                  <i data-lucide="pencil" class="w-4 h-4"></i>
+                  Edit Genset
+                </button>
+                <button id="deleteEngineBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs sm:text-sm font-medium bg-white hover:bg-rose-50 text-rose-600 border border-slate-300 hover:border-rose-300 transition" title="Delete Genset">
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              ` : ''}
+            </div>
+          </div>
+
+          <!-- Dynamic Sub-Category Tabs -->
+          <div class="mt-5 pt-3 border-t border-slate-200 flex flex-wrap items-center gap-1.5">
+            ${cats.map(cat => renderCategoryTabButton(cat, activeCat && activeCat.id === cat.id)).join('')}
+            ${canEdit ? `
+              <button id="addCategoryBtn" type="button" class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold border border-dashed border-sky-400 text-sky-700 bg-sky-50/60 hover:bg-sky-100 transition ml-1">
+                <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                Add Sub-Category
+              </button>
+            ` : ''}
+          </div>
+        </section>
+
+        <!-- Active Sub-Category Content -->
+        <div id="categoryContentArea">
+          ${renderActiveCategory(engine, activeCat)}
+        </div>
+      `;
+    }
+
+    function renderHomeView(main) {
+      const totalEngines = state.engines.length;
+      const totalBolts = state.engines.reduce((s, e) => s + (e.categories || []).filter(c => c.type === 'bolts').reduce((cs, c) => cs + c.items.reduce((bs, b) => bs + (Number(b.qty) || 0), 0), 0), 0);
+      const totalIssues = state.engines.reduce((s, e) => s + (e.categories || []).filter(c => c.type === 'issues').reduce((cs, c) => cs + c.items.length, 0), 0);
+      const totalPhotos = state.engines.reduce((s, e) => s + (e.categories || []).filter(c => c.type === 'photos').reduce((cs, c) => cs + c.items.length, 0), 0);
+
+      main.innerHTML = `
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-6">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 class="text-xl sm:text-2xl font-bold text-slate-900">Shop Home &amp; Genset Directory</h2>
+              <p class="text-sm text-slate-500 mt-1">Select a genset build to view or manage bolt lists, electrical specs, issues &amp; fixes, other specifications, and photos.</p>
+            </div>
+            ${canManageSystem() ? `
+              <button id="homeAddEngineBtn" type="button" class="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold shadow-sm transition">
+                <i data-lucide="plus" class="w-4 h-4"></i>
+                Add Genset
+              </button>
+            ` : ''}
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5">
+            <div class="p-3.5 rounded-xl bg-slate-50 border border-slate-200">
+              <div class="text-xs font-semibold text-slate-500 uppercase">Genset Models</div>
+              <div class="text-2xl font-bold text-slate-900 mt-1">${totalEngines}</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-sky-50/70 border border-sky-200">
+              <div class="text-xs font-semibold text-sky-700 uppercase">Total Fasteners</div>
+              <div class="text-2xl font-bold text-sky-900 mt-1">${totalBolts}</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-rose-50/70 border border-rose-200">
+              <div class="text-xs font-semibold text-rose-700 uppercase">Logged Issues</div>
+              <div class="text-2xl font-bold text-rose-900 mt-1">${totalIssues}</div>
+            </div>
+            <div class="p-3.5 rounded-xl bg-indigo-50/70 border border-indigo-200">
+              <div class="text-xs font-semibold text-indigo-700 uppercase">Build Photos</div>
+              <div class="text-2xl font-bold text-indigo-900 mt-1">${totalPhotos}</div>
+            </div>
+          </div>
+        </section>
+
+        <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          ${state.engines.length === 0 ? `
+            <div class="col-span-full bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-500">
+              No gensets added yet.
+            </div>
+          ` : state.engines.map(eng => {
+            const cats = eng.categories || [];
+            return `
+              <div data-open-engine-home="${escapeHtml(eng.id)}" class="cursor-pointer bg-white rounded-xl border border-slate-200 hover:border-sky-400 hover:shadow-md transition p-5 flex flex-col justify-between gap-4">
+                <div>
+                  <div class="flex items-start justify-between gap-2">
+                    <div>
+                      <h3 class="text-lg font-bold text-slate-900">${escapeHtml(eng.name)}</h3>
+                      <p class="text-xs text-slate-500 mt-0.5">${escapeHtml(eng.code || 'Custom Spec')} ${eng.application ? '&bull; ' + escapeHtml(eng.application) : ''}</p>
+                    </div>
+                    <span class="px-2 py-1 rounded-lg bg-sky-50 text-sky-700 text-xs font-semibold">Open &rarr;</span>
+                  </div>
+                  <div class="flex flex-wrap gap-1.5 mt-4 text-xs">
+                    ${cats.map(c => `<span class="px-2 py-1 rounded-md bg-slate-100 text-slate-700 font-medium">${escapeHtml(c.name)} (${c.items.length})</span>`).join('')}
+                  </div>
+                </div>
+                <div class="text-[11px] text-slate-400 border-t border-slate-100 pt-2.5 flex items-center justify-between">
+                  <span>Updated: ${escapeHtml(eng.updatedAt)}</span>
+                  <span>${cats.length} sub-categories</span>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </section>
+      `;
+    }
+
+    function renderCategoryTabButton(cat, isActive) {
+      const meta = CATEGORY_META[cat.type] || CATEGORY_META.notes;
+      const activeClasses = {
+        sky: 'bg-sky-600 text-white border-sky-600 shadow-xs',
+        amber: 'bg-amber-500 text-slate-950 border-amber-500 shadow-xs',
+        rose: 'bg-rose-600 text-white border-rose-600 shadow-xs',
+        emerald: 'bg-emerald-600 text-white border-emerald-600 shadow-xs',
+        indigo: 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+      }[meta.color];
+      const badgeActive = isActive ? 'bg-white/25 text-current' : 'bg-slate-200/80 text-slate-700';
+
+      return `
+        <button type="button" data-select-category="${cat.id}"
+          class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-semibold border transition ${isActive ? activeClasses : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'}">
+          <i data-lucide="${meta.icon}" class="w-4 h-4"></i>
+          <span>${escapeHtml(cat.name)}</span>
+          <span class="px-1.5 py-0.2 rounded-full text-[11px] font-bold ${badgeActive}">${cat.items.length}</span>
+        </button>
+      `;
+    }
+
+    function renderActiveCategory(engine, cat) {
+      if (!cat) {
+        return `
+          <section class="bg-white rounded-xl border border-slate-200 shadow-sm p-8 text-center">
+            <h3 class="text-base font-bold text-slate-800">No Sub-Categories Yet</h3>
+            <p class="text-sm text-slate-500 mt-1 mb-4">Add a sub-category like Bolt List, Electrical, Issues &amp; Fixes, or Other Specifications.</p>
+            ${canEditContent() ? `<button id="emptyAddCatBtn" type="button" class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">+ Add Sub-Category</button>` : ''}
+          </section>
+        `;
+      }
+
+      if (cat.type === 'bolts') return renderBoltsCategory(engine, cat);
+      if (cat.type === 'electrical') return renderElectricalCategory(engine, cat);
+      if (cat.type === 'issues') return renderIssuesCategory(engine, cat);
+      if (cat.type === 'photos') return renderPhotosCategory(engine, cat);
+      return renderNotesCategory(engine, cat);
+    }
+
+    function renderCategoryHeaderActions(cat) {
+      if (!canEditContent()) return '';
+      return `
+        <div class="inline-flex items-center gap-1">
+          <button type="button" data-edit-category="${cat.id}" title="Rename Sub-Category" class="p-1.5 rounded-lg bg-white hover:bg-slate-100 text-slate-600 border border-slate-300 transition">
+            <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+          </button>
+          <button type="button" data-delete-category="${cat.id}" title="Remove Sub-Category" class="p-1.5 rounded-lg bg-white hover:bg-rose-50 text-rose-600 border border-slate-300 hover:border-rose-300 transition">
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      `;
+    }
+
+    function renderBoltsCategory(engine, cat) {
+      const canAdd = canEditContent() && !cat.locked;
+      const totalBoltsQty = cat.items.reduce((s, b) => s + (Number(b.qty) || 0), 0);
+      const bq = boltSearchQuery.trim().toLowerCase();
+      const filteredBolts = cat.items.filter(b =>
+        b.name.toLowerCase().includes(bq) ||
+        b.size.toLowerCase().includes(bq) ||
+        b.washer.toLowerCase().includes(bq)
+      );
+
+      return `
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/60">
+            <div>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <i data-lucide="list-checks" class="w-4 h-4 text-sky-600"></i>
+                  ${escapeHtml(cat.name)}
+                </h3>
+                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold border ${cat.locked ? 'bg-amber-50 text-amber-800 border-amber-300' : 'bg-emerald-50 text-emerald-800 border-emerald-300'}">
+                  <i data-lucide="${cat.locked ? 'lock' : 'unlock'}" class="w-3 h-3"></i>
+                  ${cat.locked ? 'Locked' : 'Editable'}
+                </span>
+              </div>
+              <p class="text-xs text-slate-500 mt-0.5">${cat.items.length} fastener types &bull; <strong>${totalBoltsQty}</strong> total pieces</p>
+            </div>
+
+            <div class="flex flex-wrap items-center gap-2">
+              <div class="relative w-full sm:w-52">
+                <i data-lucide="search" class="w-4 h-4 text-slate-400 absolute left-2.5 top-2"></i>
+                <input id="boltSearchInput" type="text" value="${escapeHtml(boltSearchQuery)}" placeholder="Filter bolts..." class="w-full pl-8 pr-3 py-1.5 text-xs sm:text-sm bg-white border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              </div>
+
+              ${canLockToggle() ? `
+                <button id="toggleListLockBtn" type="button" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${cat.locked ? 'bg-amber-500 hover:bg-amber-600 text-slate-950 border-amber-600' : 'bg-slate-800 hover:bg-slate-900 text-white border-slate-900'}">
+                  <i data-lucide="${cat.locked ? 'unlock' : 'lock'}" class="w-3.5 h-3.5"></i>
+                  ${cat.locked ? 'Unlock List' : 'Lock List'}
+                </button>
+              ` : ''}
+              ${renderCategoryHeaderActions(cat)}
+            </div>
+          </div>
+
+          ${cat.locked ? `
+            <div class="px-4 py-2.5 bg-amber-50 border-b border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+              <i data-lucide="shield-alert" class="w-4 h-4 text-amber-600 shrink-0"></i>
+              <span><strong>List Locked${cat.lockedBy ? ` by ${escapeHtml(cat.lockedBy)}` : ''}:</strong> Protected against accidental edits across the shop. ${canLockToggle() ? 'Click "Unlock List" to edit.' : 'Only Admin can unlock.'}</span>
+            </div>
+          ` : ''}
+
+          ${canAdd ? `
+            <form id="addBoltForm" class="p-4 bg-sky-50/50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+              <div class="sm:col-span-4">
+                <label for="newBoltName" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Bolt Name *</label>
+                <input id="newBoltName" type="text" required placeholder="e.g., Skid Mount Bolt" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-3">
+                <label for="newBoltSize" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Size *</label>
+                <input id="newBoltSize" type="text" required placeholder='e.g., 5/8"-11 x 2.50"' class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-1">
+                <label for="newBoltQty" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Qty *</label>
+                <input id="newBoltQty" type="number" min="1" value="4" required class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-3">
+                <label for="newBoltWasher" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Washer Type</label>
+                <select id="newBoltWasher" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                  ${WASHER_TYPES.map(w => `<option value="${escapeHtml(w)}">${escapeHtml(w)}</option>`).join('')}
+                </select>
+              </div>
+              <div class="sm:col-span-1">
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold transition shadow-xs">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </form>
+          ` : ''}
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="py-3 px-4">Bolt Name</th>
+                  <th class="py-3 px-4">Size</th>
+                  <th class="py-3 px-4 text-center">Quantity</th>
+                  <th class="py-3 px-4">Washer Type</th>
+                  <th class="py-3 px-4 text-right">Lock / Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-sm">
+                ${filteredBolts.length === 0 ? `
+                  <tr><td colspan="5" class="py-8 text-center text-slate-500">${cat.items.length === 0 ? 'No bolts added yet.' : 'No bolts match your filter.'}</td></tr>
+                ` : filteredBolts.map(bolt => {
+                  const isRowEditing = editingRowId === bolt.id;
+                  const rowEditable = canEditBoltRow(cat, bolt);
+                  const effectivelyLocked = cat.locked || bolt.locked;
+
+                  if (isRowEditing) {
+                    return `
+                      <tr class="bg-sky-50/70">
+                        <td class="py-2.5 px-4"><input id="editBoltName_${bolt.id}" type="text" value="${escapeHtml(bolt.name)}" class="w-full px-2 py-1 text-sm bg-white border border-sky-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4"><input id="editBoltSize_${bolt.id}" type="text" value="${escapeHtml(bolt.size)}" class="w-full px-2 py-1 text-sm bg-white border border-sky-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4"><input id="editBoltQty_${bolt.id}" type="number" min="1" value="${bolt.qty}" class="w-20 mx-auto block text-center px-2 py-1 text-sm bg-white border border-sky-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4">
+                          <select id="editBoltWasher_${bolt.id}" class="w-full px-2 py-1 text-sm bg-white border border-sky-400 rounded-md">
+                            ${WASHER_TYPES.map(w => `<option value="${escapeHtml(w)}" ${w === bolt.washer ? 'selected' : ''}>${escapeHtml(w)}</option>`).join('')}
+                          </select>
+                        </td>
+                        <td class="py-2.5 px-4 text-right whitespace-nowrap space-x-1">
+                          <button type="button" data-save-bolt="${bolt.id}" class="px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">Save</button>
+                          <button type="button" data-cancel-bolt="${bolt.id}" class="px-2.5 py-1 rounded-md bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-semibold">Cancel</button>
+                        </td>
+                      </tr>
+                    `;
+                  }
+
+                  return `
+                    <tr class="hover:bg-slate-50/80 transition ${effectivelyLocked ? 'bg-slate-50/40' : ''}">
+                      <td class="py-3 px-4 font-medium text-slate-900">
+                        <div class="flex items-center gap-2">
+                          ${effectivelyLocked ? `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-500 shrink-0"></i>` : `<span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>`}
+                          <span>${escapeHtml(bolt.name)}</span>
+                        </div>
+                      </td>
+                      <td class="py-3 px-4 font-mono text-xs sm:text-sm text-slate-700">${escapeHtml(bolt.size)}</td>
+                      <td class="py-3 px-4 text-center"><span class="inline-flex items-center justify-center min-w-[2.2rem] px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-semibold text-xs">${bolt.qty}</span></td>
+                      <td class="py-3 px-4 text-slate-600 text-xs sm:text-sm">${escapeHtml(bolt.washer)}</td>
+                      <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center gap-1">
+                          ${canLockToggle() ? `
+                            <button type="button" data-toggle-row-lock="${bolt.id}" title="${bolt.locked ? 'Unlock row' : 'Lock row'}"
+                              class="p-1.5 rounded-lg border transition ${bolt.locked ? 'bg-amber-50 border-amber-300 text-amber-700 hover:bg-amber-100' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700 hover:bg-slate-100'}">
+                              <i data-lucide="${bolt.locked ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i>
+                            </button>
+                          ` : ''}
+                          ${rowEditable ? `
+                            <button type="button" data-edit-bolt="${bolt.id}" title="Edit bolt" class="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50 transition">
+                              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button type="button" data-delete-bolt="${bolt.id}" title="Delete bolt" class="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition">
+                              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                          ` : `<span class="text-[11px] text-slate-400 px-1.5">${getCurrentUser().role === 'viewer' ? 'View Only' : 'Locked'}</span>`}
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderElectricalCategory(engine, cat) {
+      const items = cat.items || [];
+      const canEdit = canEditContent();
+
+      return `
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 bg-amber-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="zap" class="w-4 h-4 text-amber-600"></i>
+                ${escapeHtml(cat.name)}
+              </h3>
+              <p class="text-xs text-slate-600 mt-0.5">Voltage, wire gauge, connectors, and control wiring specs for ${escapeHtml(engine.name)}.</p>
+            </div>
+            ${renderCategoryHeaderActions(cat)}
+          </div>
+
+          ${canEdit ? `
+            <form id="addElectricalForm" class="p-4 bg-amber-50/30 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+              <div class="sm:col-span-3">
+                <label for="newElecComp" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Component / Circuit *</label>
+                <input id="newElecComp" type="text" required placeholder="e.g., AVR Sensing" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-3">
+                <label for="newElecSpec" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Voltage / Gauge Spec *</label>
+                <input id="newElecSpec" type="text" required placeholder="e.g., 120V AC / 16 AWG" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-2">
+                <label for="newElecConn" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Connector</label>
+                <input id="newElecConn" type="text" placeholder="e.g., 12-Pin Deutsch" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-3">
+                <label for="newElecNotes" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Notes</label>
+                <input id="newElecNotes" type="text" placeholder="Routing / fuse / jumper note" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-1">
+                <button type="submit" class="w-full inline-flex items-center justify-center px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-slate-950 text-sm font-semibold transition">
+                  <i data-lucide="plus" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </form>
+          ` : ''}
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="border-b border-slate-200 bg-slate-50 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th class="py-3 px-4">Component / Circuit</th>
+                  <th class="py-3 px-4">Spec / Gauge</th>
+                  <th class="py-3 px-4">Connector</th>
+                  <th class="py-3 px-4">Notes</th>
+                  <th class="py-3 px-4 text-right">Lock / Actions</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100 text-sm">
+                ${items.length === 0 ? `
+                  <tr><td colspan="5" class="py-8 text-center text-slate-500">No electrical specs added yet.</td></tr>
+                ` : items.map(item => {
+                  const isEditing = editingRowId === item.id;
+                  const editable = canEdit && !item.locked;
+
+                  if (isEditing) {
+                    return `
+                      <tr class="bg-amber-50/50">
+                        <td class="py-2.5 px-4"><input id="editElecComp_${item.id}" type="text" value="${escapeHtml(item.component)}" class="w-full px-2 py-1 text-sm bg-white border border-amber-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4"><input id="editElecSpec_${item.id}" type="text" value="${escapeHtml(item.spec)}" class="w-full px-2 py-1 text-sm bg-white border border-amber-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4"><input id="editElecConn_${item.id}" type="text" value="${escapeHtml(item.connector)}" class="w-full px-2 py-1 text-sm bg-white border border-amber-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4"><input id="editElecNotes_${item.id}" type="text" value="${escapeHtml(item.notes)}" class="w-full px-2 py-1 text-sm bg-white border border-amber-400 rounded-md" /></td>
+                        <td class="py-2.5 px-4 text-right whitespace-nowrap space-x-1">
+                          <button type="button" data-save-elec="${item.id}" class="px-2.5 py-1 rounded-md bg-emerald-600 text-white text-xs font-semibold">Save</button>
+                          <button type="button" data-cancel-elec="${item.id}" class="px-2.5 py-1 rounded-md bg-slate-200 text-slate-700 text-xs font-semibold">Cancel</button>
+                        </td>
+                      </tr>
+                    `;
+                  }
+
+                  return `
+                    <tr class="hover:bg-slate-50/80 transition">
+                      <td class="py-3 px-4 font-medium text-slate-900">
+                        <div class="flex items-center gap-2">
+                          ${item.locked ? `<i data-lucide="lock" class="w-3.5 h-3.5 text-amber-500 shrink-0"></i>` : `<span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>`}
+                          <span>${escapeHtml(item.component)}</span>
+                        </div>
+                      </td>
+                      <td class="py-3 px-4 font-mono text-xs sm:text-sm text-slate-700">${escapeHtml(item.spec)}</td>
+                      <td class="py-3 px-4 text-xs sm:text-sm text-slate-600">${escapeHtml(item.connector || '—')}</td>
+                      <td class="py-3 px-4 text-xs sm:text-sm text-slate-600">${escapeHtml(item.notes || '—')}</td>
+                      <td class="py-3 px-4 text-right whitespace-nowrap">
+                        <div class="inline-flex items-center gap-1">
+                          ${canLockToggle() ? `
+                            <button type="button" data-toggle-elec-lock="${item.id}" class="p-1.5 rounded-lg border transition ${item.locked ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-white border-slate-200 text-slate-400 hover:text-slate-700'}">
+                              <i data-lucide="${item.locked ? 'lock' : 'unlock'}" class="w-3.5 h-3.5"></i>
+                            </button>
+                          ` : ''}
+                          ${editable ? `
+                            <button type="button" data-edit-elec="${item.id}" class="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:text-sky-600">
+                              <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                            </button>
+                            <button type="button" data-delete-elec="${item.id}" class="p-1.5 rounded-lg bg-white border border-slate-200 text-slate-500 hover:text-rose-600">
+                              <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                            </button>
+                          ` : `<span class="text-[11px] text-slate-400 px-1.5">${getCurrentUser().role === 'viewer' ? 'View Only' : 'Locked'}</span>`}
+                        </div>
+                      </td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      `;
+    }
+
+    function renderIssuesCategory(engine, cat) {
+      const issues = cat.items || [];
+      const canEdit = canEditContent();
+
+      return `
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 bg-rose-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="wrench" class="w-4 h-4 text-rose-600"></i>
+                ${escapeHtml(cat.name)}
+              </h3>
+              <p class="text-xs text-slate-600 mt-0.5">Track genset build issues, symptoms, and verified fixes (with optional photo).</p>
+            </div>
+            <div class="flex items-center gap-2">
+              ${canEdit ? `
+                <button id="toggleAddIssueBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold transition">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  Log Issue &amp; Fix
+                </button>
+              ` : ''}
+              ${renderCategoryHeaderActions(cat)}
+            </div>
+          </div>
+
+          <form id="addIssueForm" class="hidden p-4 bg-rose-50/30 border-b border-slate-200 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2">
+                <label for="issueTitleInput" class="block text-xs font-semibold text-slate-700 mb-1">Issue Title *</label>
+                <input id="issueTitleInput" type="text" required placeholder="e.g., Voltage hunting at no-load" class="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div>
+                <label for="issueStatusInput" class="block text-xs font-semibold text-slate-700 mb-1">Status</label>
+                <select id="issueStatusInput" class="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                  <option value="Open">Open</option>
+                  <option value="Resolved" selected>Resolved</option>
+                  <option value="Known Quirk">Known Quirk</option>
+                </select>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label for="issueSymptomInput" class="block text-xs font-semibold text-slate-700 mb-1">Symptom / Cause *</label>
+                <textarea id="issueSymptomInput" rows="2" required placeholder="What happens and why..." class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg"></textarea>
+              </div>
+              <div>
+                <label for="issueFixInput" class="block text-xs font-semibold text-slate-700 mb-1">Verified Fix *</label>
+                <textarea id="issueFixInput" rows="2" required placeholder="Step-by-step fix or adjustment..." class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg"></textarea>
+              </div>
+            </div>
+            <div class="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <label for="issuePhotoInput" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 cursor-pointer">
+                  <i data-lucide="camera" class="w-3.5 h-3.5 text-indigo-600"></i>
+                  Attach Photo (Optional)
+                </label>
+                <input id="issuePhotoInput" type="file" accept="image/*" class="hidden" />
+                <span id="issuePhotoFileName" class="text-xs text-slate-500 ml-2"></span>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" id="cancelAddIssueBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+                <button type="submit" class="px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold">Save Issue &amp; Fix</button>
+              </div>
+            </div>
+          </form>
+
+          <div class="p-4 sm:p-5 space-y-3">
+            ${issues.length === 0 ? `
+              <div class="text-center py-8 text-sm text-slate-500">No issues or fixes logged yet.</div>
+            ` : issues.map(iss => {
+              const statusBadge = iss.status === 'Resolved'
+                ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                : iss.status === 'Open'
+                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                : 'bg-amber-100 text-amber-800 border-amber-200';
+
+              if (editingRowId === iss.id) {
+                return `
+                  <div class="p-4 rounded-xl border-2 border-rose-300 bg-rose-50/30 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <input id="editIssueTitle_${iss.id}" type="text" value="${escapeHtml(iss.title)}" class="sm:col-span-2 px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+                      <select id="editIssueStatus_${iss.id}" class="px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                        ${['Open', 'Resolved', 'Known Quirk'].map(s => `<option value="${s}" ${s === iss.status ? 'selected' : ''}>${s}</option>`).join('')}
+                      </select>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      <textarea id="editIssueSymptom_${iss.id}" rows="2" class="px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg">${escapeHtml(iss.symptom)}</textarea>
+                      <textarea id="editIssueFix_${iss.id}" rows="2" class="px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg">${escapeHtml(iss.fix)}</textarea>
+                    </div>
+                    <div class="flex justify-end gap-2">
+                      <button type="button" data-cancel-issue="${iss.id}" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-200">Cancel</button>
+                      <button type="button" data-save-issue="${iss.id}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-rose-600 text-white">Update</button>
+                    </div>
+                  </div>
+                `;
+              }
+
+              return `
+                <article class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white transition">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="space-y-2 flex-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-md border text-[11px] font-semibold ${statusBadge}">${escapeHtml(iss.status)}</span>
+                        <h4 class="text-sm font-bold text-slate-900">${escapeHtml(iss.title)}</h4>
+                      </div>
+                      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm">
+                        <div class="p-2.5 rounded-lg bg-white border border-slate-200">
+                          <span class="font-bold text-slate-500 uppercase text-[10px] block mb-0.5">Symptom / Cause</span>
+                          <p class="text-slate-700">${escapeHtml(iss.symptom)}</p>
+                        </div>
+                        <div class="p-2.5 rounded-lg bg-emerald-50/50 border border-emerald-200">
+                          <span class="font-bold text-emerald-700 uppercase text-[10px] block mb-0.5">Verified Fix</span>
+                          <p class="text-slate-800">${escapeHtml(iss.fix)}</p>
+                        </div>
+                      </div>
+                      ${iss.photo ? `
+                        <div class="pt-1">
+                          <button type="button" data-view-photo-src="${iss.photo}" data-view-photo-title="${escapeHtml(iss.title)}" data-view-photo-meta="Issue Photo • ${escapeHtml(iss.author)}" class="inline-flex items-center gap-2 p-1.5 rounded-lg border border-slate-200 bg-white hover:border-indigo-400">
+                            <img src="${iss.photo}" alt="Issue photo" class="w-16 h-12 object-cover rounded" />
+                            <span class="text-xs font-medium text-indigo-600 pr-2">View Photo</span>
+                          </button>
+                        </div>
+                      ` : ''}
+                      <div class="text-[11px] text-slate-400">Logged by <strong class="text-slate-600">${escapeHtml(iss.author)}</strong> &bull; ${escapeHtml(iss.timestamp)}</div>
+                    </div>
+                    ${canEdit ? `
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" data-edit-issue="${iss.id}" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                        ${isAdmin() ? `<button type="button" data-delete-issue="${iss.id}" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
+                      </div>
+                    ` : ''}
+                  </div>
+                </article>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderNotesCategory(engine, cat) {
+      const notes = cat.items || [];
+      const canEdit = canEditContent();
+
+      return `
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 bg-emerald-50/50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="clipboard-list" class="w-4 h-4 text-emerald-600"></i>
+                ${escapeHtml(cat.name)}
+              </h3>
+              <p class="text-xs text-slate-600 mt-0.5">Fluid capacities, load bank procedures, alignment checks, and shop build notes. Updates propagate system-wide.</p>
+            </div>
+            <div class="flex items-center gap-2">
+              ${canEdit ? `
+                <button id="toggleAddNoteBtn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition shadow-xs">
+                  <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+                  Add Spec / Note
+                </button>
+              ` : ''}
+              ${renderCategoryHeaderActions(cat)}
+            </div>
+          </div>
+
+          <form id="addQualityNoteForm" class="hidden p-4 bg-emerald-50/30 border-b border-slate-200 space-y-3">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div class="sm:col-span-2">
+                <label for="noteTitleInput" class="block text-xs font-semibold text-slate-700 mb-1">Specification Title *</label>
+                <input id="noteTitleInput" type="text" required placeholder="e.g., Load Bank Test &amp; Coolant Fill" class="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div>
+                <label for="noteTagInput" class="block text-xs font-semibold text-slate-700 mb-1">Tag</label>
+                <select id="noteTagInput" class="w-full px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                  <option value="Quality Standard">Quality Standard</option>
+                  <option value="Fluid / Fill Spec">Fluid / Fill Spec</option>
+                  <option value="Alignment Check">Alignment Check</option>
+                  <option value="Shop Alert">Shop Alert</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label for="noteBodyInput" class="block text-xs font-semibold text-slate-700 mb-1">Details / Procedure *</label>
+              <textarea id="noteBodyInput" rows="3" required placeholder="Enter exact specs, capacities, tolerances, or build instructions..." class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg"></textarea>
+            </div>
+            <div class="flex items-center justify-end gap-2">
+              <button type="button" id="cancelAddNoteBtn" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-100">Cancel</button>
+              <button type="submit" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold">Save System-Wide</button>
+            </div>
+          </form>
+
+          <div class="p-4 sm:p-5 space-y-3">
+            ${notes.length === 0 ? `
+              <div class="text-center py-6 text-sm text-slate-500">No specifications recorded in ${escapeHtml(cat.name)} yet.</div>
+            ` : notes.map(note => {
+              const tagColors = note.tag === 'Shop Alert'
+                ? 'bg-rose-100 text-rose-800 border-rose-200'
+                : note.tag === 'Alignment Check'
+                ? 'bg-sky-100 text-sky-800 border-sky-200'
+                : note.tag === 'Fluid / Fill Spec'
+                ? 'bg-amber-100 text-amber-800 border-amber-200'
+                : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+              if (editingRowId === note.id) {
+                return `
+                  <div class="p-4 rounded-xl border-2 border-emerald-400 bg-emerald-50/30 space-y-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      <input id="editNoteTitle_${note.id}" type="text" value="${escapeHtml(note.title)}" class="sm:col-span-2 px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+                      <select id="editNoteTag_${note.id}" class="px-3 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                        ${['Quality Standard', 'Fluid / Fill Spec', 'Alignment Check', 'Shop Alert'].map(t => `<option value="${t}" ${t === note.tag ? 'selected' : ''}>${t}</option>`).join('')}
+                      </select>
+                    </div>
+                    <textarea id="editNoteBody_${note.id}" rows="3" class="w-full px-3 py-2 text-sm bg-white border border-slate-300 rounded-lg">${escapeHtml(note.body)}</textarea>
+                    <div class="flex justify-end gap-2">
+                      <button type="button" data-cancel-note="${note.id}" class="px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-200">Cancel</button>
+                      <button type="button" data-save-note="${note.id}" class="px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white">Update</button>
+                    </div>
+                  </div>
+                `;
+              }
+
+              return `
+                <article class="p-4 rounded-xl border border-slate-200 bg-slate-50/50 hover:bg-white transition">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="space-y-1">
+                      <div class="flex flex-wrap items-center gap-2">
+                        <span class="px-2 py-0.5 rounded-md border text-[11px] font-semibold ${tagColors}">${escapeHtml(note.tag)}</span>
+                        <h4 class="text-sm font-bold text-slate-900">${escapeHtml(note.title)}</h4>
+                      </div>
+                      <p class="text-sm text-slate-700 leading-relaxed whitespace-pre-line">${escapeHtml(note.body)}</p>
+                      <div class="text-[11px] text-slate-400 pt-1">Logged by <strong class="text-slate-600">${escapeHtml(note.author)}</strong> &bull; ${escapeHtml(note.timestamp)}</div>
+                    </div>
+                    ${canEdit ? `
+                      <div class="flex items-center gap-1 shrink-0">
+                        <button type="button" data-edit-note="${note.id}" class="p-1.5 rounded-lg text-slate-400 hover:text-sky-600 hover:bg-sky-50"><i data-lucide="pencil" class="w-3.5 h-3.5"></i></button>
+                        ${isAdmin() ? `<button type="button" data-delete-note="${note.id}" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-3.5 h-3.5"></i></button>` : ''}
+                      </div>
+                    ` : ''}
+                  </div>
+                </article>
+              `;
+            }).join('')}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderPhotosCategory(engine, cat) {
+      const photos = cat.items || [];
+      const canEdit = canEditContent();
+
+      return `
+        <section class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="p-4 sm:p-5 border-b border-slate-200 bg-indigo-50/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i data-lucide="camera" class="w-4 h-4 text-indigo-600"></i>
+                ${escapeHtml(cat.name)}
+              </h3>
+              <p class="text-xs text-slate-600 mt-0.5">Upload wiring diagrams, skid layout references, or genset inspection photos.</p>
+            </div>
+            ${renderCategoryHeaderActions(cat)}
+          </div>
+
+          ${canEdit ? `
+            <form id="addPhotoForm" class="p-4 bg-indigo-50/30 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-12 gap-2.5 items-end">
+              <div class="sm:col-span-4">
+                <label for="photoCaptionInput" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Photo Caption *</label>
+                <input id="photoCaptionInput" type="text" required placeholder="e.g., Control panel terminal strip" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg" />
+              </div>
+              <div class="sm:col-span-3">
+                <label for="photoCatInput" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Tag</label>
+                <select id="photoCatInput" class="w-full px-2.5 py-1.5 text-sm bg-white border border-slate-300 rounded-lg">
+                  <option value="Build / Bolts">Build / Bolts</option>
+                  <option value="Electrical">Electrical</option>
+                  <option value="Issue / Fix">Issue / Fix</option>
+                  <option value="Other Spec">Other Spec</option>
+                </select>
+              </div>
+              <div class="sm:col-span-3">
+                <label for="photoFileInput" class="block text-[11px] font-semibold text-slate-600 uppercase mb-1">Select Image(s) *</label>
+                <input id="photoFileInput" type="file" accept="image/*" multiple required class="w-full text-xs text-slate-600 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-indigo-100 file:text-indigo-700 hover:file:bg-indigo-200" />
+              </div>
+              <div class="sm:col-span-2">
+                <button type="submit" class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold transition">
+                  <i data-lucide="upload" class="w-4 h-4"></i>
+                  Upload
+                </button>
+              </div>
+            </form>
+          ` : ''}
+
+          <div class="p-4 sm:p-5">
+            ${photos.length === 0 ? `
+              <div class="text-center py-10 text-sm text-slate-500">
+                <i data-lucide="image" class="w-10 h-10 text-slate-300 mx-auto mb-2"></i>
+                No photos uploaded for ${escapeHtml(engine.name)} yet.
+              </div>
+            ` : `
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                ${photos.map(p => `
+                  <div class="rounded-xl border border-slate-200 overflow-hidden bg-slate-50 flex flex-col">
+                    <button type="button" data-view-photo-src="${p.dataUrl}" data-view-photo-title="${escapeHtml(p.caption)}" data-view-photo-meta="${escapeHtml(p.category)} • ${escapeHtml(p.author)} • ${escapeHtml(p.timestamp)}" class="block w-full h-44 bg-slate-900 overflow-hidden group">
+                      <img src="${p.dataUrl}" alt="${escapeHtml(p.caption)}" class="w-full h-full object-cover group-hover:scale-105 transition duration-200" />
+                    </button>
+                    <div class="p-3 flex items-start justify-between gap-2">
+                      <div>
+                        <span class="inline-block px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800 text-[10px] font-semibold mb-1">${escapeHtml(p.category)}</span>
+                        <div class="text-sm font-semibold text-slate-900">${escapeHtml(p.caption)}</div>
+                        <div class="text-[11px] text-slate-400 mt-0.5">${escapeHtml(p.author)} &bull; ${escapeHtml(p.timestamp)}</div>
+                      </div>
+                      ${canEdit ? `
+                        <button type="button" data-delete-photo="${p.id}" title="Delete photo" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50">
+                          <i data-lucide="trash-2" class="w-4 h-4"></i>
+                        </button>
+                      ` : ''}
+                    </div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        </section>
+      `;
+    }
+
+    function renderAuthModal() {
+      const list = document.getElementById('authUserQuickList');
+      const current = getCurrentUser();
+      const nonAdmins = state.users.filter(u => u.role !== 'admin');
+
+      if (nonAdmins.length === 0) {
+        list.innerHTML = '<p class="text-xs text-slate-400">No Viewer or Editor accounts yet. Sign in above with Google or Email.</p>';
+      } else {
+        list.innerHTML = nonAdmins.map(u => {
+          const isMe = u.id === current.id;
+          const badge = ROLE_META[u.role]?.lightBadge || '';
+          return `
+            <button type="button" data-quick-login="${u.id}" class="w-full flex items-center justify-between p-2.5 rounded-lg border ${isMe ? 'border-sky-400 bg-sky-50' : 'border-slate-200 hover:bg-slate-50'} text-left transition">
+              <div>
+                <div class="text-xs font-bold text-slate-900">${escapeHtml(u.name)} ${isMe ? '<span class="text-sky-600">(Signed In)</span>' : ''}</div>
+                <div class="text-[11px] text-slate-500">${escapeHtml(u.email)} &bull; ${u.provider === 'google' ? 'Google' : 'Email'}</div>
+              </div>
+              <span class="px-2 py-0.5 rounded border text-[11px] font-semibold ${badge}">${ROLE_META[u.role]?.label || u.role}</span>
+            </button>
+          `;
+        }).join('');
+      }
+      lucide.createIcons({ root: document.getElementById('authModal') });
+    }
+
+    function renderUsersModal() {
+      const container = document.getElementById('usersListContainer');
+      const admin = isAdmin();
+
+      container.innerHTML = state.users.map(u => {
+        const isMe = u.id === state.currentUserId;
+        return `
+          <div class="p-3 bg-white flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-700 flex items-center justify-center font-bold text-xs">${escapeHtml(u.name.slice(0, 2).toUpperCase())}</div>
+              <div>
+                <div class="text-sm font-semibold text-slate-900">${escapeHtml(u.name)} ${isMe ? '<span class="text-[11px] text-sky-600 font-medium">(Active)</span>' : ''}</div>
+                <div class="text-xs text-slate-500">${escapeHtml(u.email || '')} &bull; ${u.provider === 'google' ? 'Google' : u.provider === 'admin' ? 'Owner' : 'Email'}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <select data-change-user-role="${u.id}" ${!admin || isMe ? 'disabled' : ''} class="px-2.5 py-1 text-xs bg-slate-50 border border-slate-300 rounded-lg disabled:opacity-60">
+                <option value="viewer" ${u.role === 'viewer' ? 'selected' : ''}>Viewer</option>
+                <option value="editor" ${u.role === 'editor' ? 'selected' : ''}>Editor</option>
+                <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+              </select>
+              ${admin && state.users.length > 1 && !isMe ? `
+                <button type="button" data-delete-user="${u.id}" class="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+              ` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      document.getElementById('adminUserControls').classList.toggle('hidden', !admin);
+      lucide.createIcons({ root: container });
+    }
+
+    function renderAuditModal() {
+      const container = document.getElementById('auditLogContainer');
+      if (state.auditLog.length === 0) {
+        container.innerHTML = '<p class="text-sm text-slate-500 text-center py-6">No system changes recorded yet.</p>';
+        return;
+      }
+      container.innerHTML = state.auditLog.map(entry => `
+        <div class="p-3 rounded-xl border border-slate-200 bg-slate-50 flex items-start justify-between gap-3 text-xs sm:text-sm">
+          <div>
+            <span class="font-semibold text-slate-900">${escapeHtml(entry.user)}</span>
+            <span class="text-[11px] px-1.5 py-0.5 rounded border ml-1 ${ROLE_META[entry.role]?.lightBadge || 'bg-slate-100 text-slate-700'}">${ROLE_META[entry.role]?.label || entry.role}</span>
+            <p class="text-slate-700 mt-1">${escapeHtml(entry.action)}</p>
+          </div>
+          <span class="text-[11px] text-slate-400 whitespace-nowrap">${escapeHtml(entry.time)}</span>
+        </div>
+      `).join('');
+    }
+
+    // Global Listeners
+    document.getElementById('homeBtn').addEventListener('click', () => {
+      state.currentView = 'home';
+      saveState();
+      renderAll();
+    });
+
+    document.getElementById('openAuthModalBtn').addEventListener('click', () => {
+      renderAuthModal();
+      openModal('authModal');
+    });
+
+    document.getElementById('adminLoginForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const pin = document.getElementById('adminPinInput').value.trim();
+      if (pin !== state.adminPin) {
+        showToast('Incorrect Admin PIN', 'error');
+        return;
+      }
+      const adminUser = state.users.find(u => u.role === 'admin') || state.users[0];
+      state.currentUserId = adminUser.id;
+      document.getElementById('adminPinInput').value = '';
+      editingRowId = null;
+      saveState();
+      closeModal('authModal');
+      renderAll();
+      showToast(`Signed in as ${adminUser.name} (Admin)`);
+    });
+
+    document.getElementById('externalLoginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const provider = e.submitter?.dataset.provider || 'email';
+      if (cloudAuth && provider === 'google') {
+        try {
+          await cloudAuth.signInWithPopup(new firebase.auth.GoogleAuthProvider());
+          closeModal('authModal');
+          showToast('Signed in with Google');
+        } catch (err) {
+          showToast(err.message || 'Google sign-in failed', 'error');
+        }
+        return;
+      }
+      const name = document.getElementById('loginNameInput').value.trim();
+      const email = document.getElementById('loginEmailInput').value.trim().toLowerCase();
+      if (!name || !email) return;
+
+      let user = state.users.find(u => (u.email || '').toLowerCase() === email);
+      if (!user) {
+        user = { id: 'u_' + Date.now(), name, email, provider, role: 'viewer' };
+        state.users.push(user);
+        saveState(`${name} (${email}) signed in via ${provider} — assigned Viewer access`);
+      } else {
+        saveState();
+      }
+
+      if (user.role === 'admin') {
+        showToast('Admin accounts require the Admin PIN above', 'warn');
+        return;
+      }
+
+      state.currentUserId = user.id;
+      document.getElementById('loginNameInput').value = '';
+      document.getElementById('loginEmailInput').value = '';
+      editingRowId = null;
+      closeModal('authModal');
+      renderAll();
+      showToast(`Signed in as ${user.name} (${ROLE_META[user.role].label})`);
+    });
+
+    document.getElementById('authUserQuickList').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-quick-login]');
+      if (!btn) return;
+      const user = state.users.find(u => u.id === btn.dataset.quickLogin);
+      if (!user || user.role === 'admin') return;
+      state.currentUserId = user.id;
+      editingRowId = null;
+      saveState();
+      closeModal('authModal');
+      renderAll();
+      showToast(`Signed in as ${user.name} (${ROLE_META[user.role].label})`);
+    });
+
+    document.getElementById('engineSearchInput').addEventListener('input', (e) => {
+      engineSearchQuery = e.target.value;
+      renderSidebar();
+      lucide.createIcons({ root: document.getElementById('engineListContainer') });
+    });
+
+    function openAddEngineModal() {
+      if (!canManageSystem()) return;
+      document.getElementById('engineModalTitle').textContent = 'Add New Genset / Engine';
+      document.getElementById('editEngineId').value = '';
+      document.getElementById('engineNameInput').value = '';
+      document.getElementById('engineCodeInput').value = '';
+      document.getElementById('engineAppInput').value = '';
+      openModal('engineModal');
+    }
+
+    document.getElementById('addEngineBtn').addEventListener('click', openAddEngineModal);
+
+    document.getElementById('engineForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!canManageSystem()) return;
+      const id = document.getElementById('editEngineId').value;
+      const name = document.getElementById('engineNameInput').value.trim();
+      const code = document.getElementById('engineCodeInput').value.trim();
+      const app = document.getElementById('engineAppInput').value.trim();
+      if (!name) return;
+
+      if (id) {
+        const eng = state.engines.find(x => x.id === id);
+        if (eng) {
+          eng.name = name;
+          eng.code = code;
+          eng.application = app;
+          saveState(`Updated genset info for ${name}`);
+          showToast(`Updated ${name} across system`);
+        }
+      } else {
+        const c1 = 'cat_' + Date.now() + '_1';
+        const newEng = {
+          id: 'gs_' + Date.now(),
+          name,
+          code,
+          application: app,
+          updatedAt: 'Just now',
+          selectedCategoryId: c1,
+          categories: [
+            { id: c1, name: 'Bolt List', type: 'bolts', locked: false, lockedBy: null, items: [] },
+            { id: 'cat_' + Date.now() + '_2', name: 'Electrical', type: 'electrical', locked: false, items: [] },
+            { id: 'cat_' + Date.now() + '_3', name: 'Issues & Fixes', type: 'issues', items: [] },
+            { id: 'cat_' + Date.now() + '_4', name: 'Other Specifications', type: 'notes', items: [] },
+            { id: 'cat_' + Date.now() + '_5', name: 'Photos', type: 'photos', items: [] }
+          ]
+        };
+        state.engines.unshift(newEng);
+        state.selectedEngineId = newEng.id;
+        state.currentView = 'engine';
+        saveState(`Added new genset: ${name}`);
+        showToast(`Added ${name} to shop system`);
+      }
+      closeModal('engineModal');
+      renderAll();
+    });
+
+    function openAddCategoryModal() {
+      if (!canEditContent()) return;
+      document.getElementById('categoryModalTitle').textContent = 'Add Sub-Category';
+      document.getElementById('editCategoryId').value = '';
+      document.getElementById('categoryNameInput').value = '';
+      document.getElementById('categoryTypeWrapper').classList.remove('hidden');
+      openModal('categoryModal');
+    }
+
+    document.getElementById('categoryForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      const engine = getSelectedEngine();
+      if (!engine || !canEditContent()) return;
+      const cid = document.getElementById('editCategoryId').value;
+      const name = document.getElementById('categoryNameInput').value.trim();
+      const type = document.getElementById('categoryTypeInput').value;
+      if (!name) return;
+
+      if (cid) {
+        const cat = engine.categories.find(c => c.id === cid);
+        if (cat) {
+          const oldName = cat.name;
+          cat.name = name;
+          saveState(`Renamed sub-category "${oldName}" to "${name}" on ${engine.name}`);
+          showToast(`Renamed to "${name}"`);
+        }
+      } else {
+        const newCat = { id: 'cat_' + Date.now(), name, type, locked: false, lockedBy: null, items: [] };
+        engine.categories.push(newCat);
+        engine.selectedCategoryId = newCat.id;
+        saveState(`Added sub-category "${name}" to ${engine.name}`);
+        showToast(`Added "${name}"`);
+      }
+      closeModal('categoryModal');
+      renderAll();
+    });
+
+    document.getElementById('openUsersModalBtn').addEventListener('click', () => {
+      renderUsersModal();
+      openModal('usersModal');
+    });
+
+    document.getElementById('openAuditModalBtn').addEventListener('click', () => {
+      renderAuditModal();
+      openModal('auditModal');
+    });
+
+    document.getElementById('resetDemoBtn').addEventListener('click', () => {
+      openConfirm('Reset Demo Data?', 'This will restore the default gensets, sub-categories, bolts, electrical, issues, specs, and user roles.', () => {
+        state = getDefaultState();
+        editingRowId = null;
+        saveState();
+        renderAll();
+        showToast('Demo data restored');
+      });
+    });
+
+    document.getElementById('confirmCancelBtn').addEventListener('click', () => {
+      confirmCallback = null;
+      closeModal('confirmModal');
+    });
+
+    document.getElementById('confirmProceedBtn').addEventListener('click', () => {
+      if (typeof confirmCallback === 'function') confirmCallback();
+      confirmCallback = null;
+      closeModal('confirmModal');
+    });
+
+    document.querySelectorAll('.closeModalBtn').forEach(btn => {
+      btn.addEventListener('click', () => closeModal(btn.dataset.modal));
+    });
+
+    document.getElementById('engineListContainer').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-select-engine]');
+      if (!btn) return;
+      state.selectedEngineId = btn.dataset.selectEngine;
+      state.currentView = 'engine';
+      editingRowId = null;
+      saveState();
+      renderAll();
+    });
+
+    document.getElementById('usersListContainer').addEventListener('change', (e) => {
+      const sel = e.target.closest('[data-change-user-role]');
+      if (!sel || !isAdmin()) return;
+      const user = state.users.find(u => u.id === sel.dataset.changeUserRole);
+      if (user) {
+        user.role = sel.value;
+        saveState(`Changed ${user.name}'s access level to ${ROLE_META[user.role].label}`);
+        renderUsersModal();
+        renderAll();
+        showToast(`${user.name} is now ${ROLE_META[user.role].label}`);
+      }
+    });
+
+    document.getElementById('usersListContainer').addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-delete-user]');
+      if (!btn || !isAdmin()) return;
+      const uid = btn.dataset.deleteUser;
+      const user = state.users.find(u => u.id === uid);
+      if (!user) return;
+      state.users = state.users.filter(u => u.id !== uid);
+      saveState(`Removed user ${user.name}`);
+      renderUsersModal();
+      renderAll();
+      showToast(`Removed ${user.name}`);
+    });
+
+    document.getElementById('addUserForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!isAdmin()) return;
+      const name = document.getElementById('newUserName').value.trim();
+      const email = document.getElementById('newUserEmail').value.trim().toLowerCase();
+      const role = document.getElementById('newUserRole').value;
+      if (!name) return;
+      state.users.push({ id: 'u_' + Date.now(), name, email: email || `${name.toLowerCase()}@shop.local`, provider: 'email', role });
+      document.getElementById('newUserName').value = '';
+      document.getElementById('newUserEmail').value = '';
+      saveState(`Added ${name} as ${ROLE_META[role].label}`);
+      renderUsersModal();
+      renderAll();
+      showToast(`Added ${name} (${ROLE_META[role].label})`);
+    });
+
+    document.getElementById('changePinForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      if (!isAdmin()) return;
+      const newPin = document.getElementById('newAdminPinInput').value.trim();
+      if (newPin.length < 4) return showToast('PIN must be at least 4 characters', 'error');
+      state.adminPin = newPin;
+      document.getElementById('newAdminPinInput').value = '';
+      saveState('Updated Admin PIN');
+      showToast('Admin PIN updated');
+    });
+
+    // Main Workspace Delegation
+    const mainEl = document.getElementById('mainWorkspace');
+
+    mainEl.addEventListener('input', (e) => {
+      if (e.target.id === 'boltSearchInput') {
+        boltSearchQuery = e.target.value;
+        const pos = e.target.selectionStart;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        const input = document.getElementById('boltSearchInput');
+        if (input) {
+          input.focus();
+          input.setSelectionRange(pos, pos);
+        }
+      }
+    });
+
+    mainEl.addEventListener('change', (e) => {
+      if (e.target.id === 'issuePhotoInput') {
+        const f = e.target.files?.[0];
+        const label = document.getElementById('issuePhotoFileName');
+        if (label) label.textContent = f ? f.name : '';
+      }
+    });
+
+    mainEl.addEventListener('submit', async (e) => {
+      const engine = getSelectedEngine();
+      if (!engine) return;
+      const activeCat = getSelectedCategory(engine);
+      if (!activeCat) return;
+
+      if (e.target.id === 'addBoltForm' && activeCat.type === 'bolts') {
+        e.preventDefault();
+        if (!canEditContent() || activeCat.locked) return;
+        const name = document.getElementById('newBoltName').value.trim();
+        const size = document.getElementById('newBoltSize').value.trim();
+        const qty = parseInt(document.getElementById('newBoltQty').value, 10) || 1;
+        const washer = document.getElementById('newBoltWasher').value;
+        if (!name || !size) return;
+
+        activeCat.items.push({ id: 'b_' + Date.now(), name, size, qty, washer, locked: false });
+        saveState(`Added "${name}" (${size}, qty ${qty}) to ${activeCat.name} on ${engine.name}`);
+        renderAll();
+        showToast('Fastener added system-wide');
+      }
+
+      if (e.target.id === 'addElectricalForm' && activeCat.type === 'electrical') {
+        e.preventDefault();
+        if (!canEditContent()) return;
+        const component = document.getElementById('newElecComp').value.trim();
+        const spec = document.getElementById('newElecSpec').value.trim();
+        const connector = document.getElementById('newElecConn').value.trim();
+        const notes = document.getElementById('newElecNotes').value.trim();
+        if (!component || !spec) return;
+
+        activeCat.items.push({ id: 'el_' + Date.now(), component, spec, connector, notes, locked: false });
+        saveState(`Added electrical spec "${component}" to ${activeCat.name} on ${engine.name}`);
+        renderAll();
+        showToast('Electrical spec added system-wide');
+      }
+
+      if (e.target.id === 'addIssueForm' && activeCat.type === 'issues') {
+        e.preventDefault();
+        if (!canEditContent()) return;
+        const title = document.getElementById('issueTitleInput').value.trim();
+        const status = document.getElementById('issueStatusInput').value;
+        const symptom = document.getElementById('issueSymptomInput').value.trim();
+        const fix = document.getElementById('issueFixInput').value.trim();
+        const fileInput = document.getElementById('issuePhotoInput');
+        if (!title || !symptom || !fix) return;
+
+        let photoData = null;
+        if (fileInput && fileInput.files && fileInput.files[0]) {
+          try { photoData = await compressImageFile(fileInput.files[0]); } catch (err) {}
+        }
+
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        activeCat.items.unshift({
+          id: 'is_' + Date.now(),
+          title, status, symptom, fix,
+          author: getCurrentUser().name,
+          timestamp: 'Today, ' + nowStr,
+          photo: photoData
+        });
+        saveState(`Logged issue "${title}" in ${activeCat.name} on ${engine.name}`);
+        renderAll();
+        showToast('Issue & fix saved system-wide');
+      }
+
+      if (e.target.id === 'addQualityNoteForm' && activeCat.type === 'notes') {
+        e.preventDefault();
+        if (!canEditContent()) return;
+        const title = document.getElementById('noteTitleInput').value.trim();
+        const tag = document.getElementById('noteTagInput').value;
+        const body = document.getElementById('noteBodyInput').value.trim();
+        if (!title || !body) return;
+
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        activeCat.items.unshift({
+          id: 'qn_' + Date.now(),
+          tag, title, body,
+          author: getCurrentUser().name,
+          timestamp: 'Today, ' + nowStr
+        });
+        saveState(`Added "${title}" to ${activeCat.name} on ${engine.name}`);
+        renderAll();
+        showToast('Specification saved system-wide');
+      }
+
+      if (e.target.id === 'addPhotoForm' && activeCat.type === 'photos') {
+        e.preventDefault();
+        if (!canEditContent()) return;
+        const caption = document.getElementById('photoCaptionInput').value.trim();
+        const category = document.getElementById('photoCatInput').value;
+        const files = document.getElementById('photoFileInput').files;
+        if (!caption || !files || files.length === 0) return;
+
+        const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        for (let i = 0; i < files.length; i++) {
+          try {
+            const dataUrl = await compressImageFile(files[i]);
+            activeCat.items.unshift({
+              id: 'ph_' + Date.now() + '_' + i,
+              caption: files.length > 1 ? `${caption} (${i + 1})` : caption,
+              category,
+              dataUrl,
+              author: getCurrentUser().name,
+              timestamp: 'Today, ' + nowStr
+            });
+          } catch (err) {}
+        }
+        saveState(`Uploaded ${files.length} photo(s) to ${activeCat.name} on ${engine.name}`);
+        renderAll();
+        showToast('Photo(s) uploaded system-wide');
+      }
+    });
+
+    mainEl.addEventListener('click', (e) => {
+      const target = e.target;
+
+      if (target.closest('#homeAddEngineBtn')) return openAddEngineModal();
+
+      const openHomeCard = target.closest('[data-open-engine-home]');
+      if (openHomeCard) {
+        state.selectedEngineId = openHomeCard.dataset.openEngineHome;
+        state.currentView = 'engine';
+        saveState();
+        renderAll();
+        return;
+      }
+
+      const photoTrigger = target.closest('[data-view-photo-src]');
+      if (photoTrigger) {
+        document.getElementById('lightboxImg').src = photoTrigger.dataset.viewPhotoSrc;
+        document.getElementById('lightboxTitle').textContent = photoTrigger.dataset.viewPhotoTitle || 'Photo';
+        document.getElementById('lightboxMeta').textContent = photoTrigger.dataset.viewPhotoMeta || '';
+        openModal('photoLightboxModal');
+        return;
+      }
+
+      const engine = getSelectedEngine();
+      if (!engine) return;
+
+      if (target.closest('#addCategoryBtn') || target.closest('#emptyAddCatBtn')) {
+        return openAddCategoryModal();
+      }
+
+      const selCatBtn = target.closest('[data-select-category]');
+      if (selCatBtn) {
+        engine.selectedCategoryId = selCatBtn.dataset.selectCategory;
+        editingRowId = null;
+        saveState();
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      const editCatBtn = target.closest('[data-edit-category]');
+      if (editCatBtn && canEditContent()) {
+        const cat = engine.categories.find(c => c.id === editCatBtn.dataset.editCategory);
+        if (cat) {
+          document.getElementById('categoryModalTitle').textContent = 'Rename Sub-Category';
+          document.getElementById('editCategoryId').value = cat.id;
+          document.getElementById('categoryNameInput').value = cat.name;
+          document.getElementById('categoryTypeWrapper').classList.add('hidden');
+          openModal('categoryModal');
+        }
+        return;
+      }
+
+      const delCatBtn = target.closest('[data-delete-category]');
+      if (delCatBtn && canEditContent()) {
+        const cat = engine.categories.find(c => c.id === delCatBtn.dataset.deleteCategory);
+        if (cat) {
+          openConfirm(`Remove "${cat.name}"?`, `This will delete the "${cat.name}" sub-category and its items from ${engine.name}.`, () => {
+            engine.categories = engine.categories.filter(c => c.id !== cat.id);
+            engine.selectedCategoryId = engine.categories[0]?.id || null;
+            saveState(`Removed sub-category "${cat.name}" from ${engine.name}`);
+            renderAll();
+            showToast(`Removed "${cat.name}"`);
+          });
+        }
+        return;
+      }
+
+      if (target.closest('#editEngineInfoBtn') && canManageSystem()) {
+        document.getElementById('engineModalTitle').textContent = 'Edit Genset / Engine Info';
+        document.getElementById('editEngineId').value = engine.id;
+        document.getElementById('engineNameInput').value = engine.name;
+        document.getElementById('engineCodeInput').value = engine.code || '';
+        document.getElementById('engineAppInput').value = engine.application || '';
+        openModal('engineModal');
+        return;
+      }
+
+      if (target.closest('#deleteEngineBtn') && canManageSystem()) {
+        openConfirm(`Delete ${engine.name}?`, 'This will remove the genset and all its sub-categories across the shop.', () => {
+          const removedName = engine.name;
+          state.engines = state.engines.filter(x => x.id !== engine.id);
+          state.selectedEngineId = state.engines[0]?.id || null;
+          if (!state.selectedEngineId) state.currentView = 'home';
+          saveState(`Deleted genset: ${removedName}`);
+          renderAll();
+          showToast(`Deleted ${removedName}`);
+        });
+        return;
+      }
+
+      const activeCat = getSelectedCategory(engine);
+      if (!activeCat) return;
+
+      if (target.closest('#toggleListLockBtn') && activeCat.type === 'bolts' && canLockToggle()) {
+        activeCat.locked = !activeCat.locked;
+        activeCat.lockedBy = activeCat.locked ? getCurrentUser().name : null;
+        editingRowId = null;
+        saveState(`${activeCat.locked ? 'Locked' : 'Unlocked'} "${activeCat.name}" on ${engine.name}`);
+        renderAll();
+        showToast(`"${activeCat.name}" ${activeCat.locked ? 'locked' : 'unlocked'}`, activeCat.locked ? 'warn' : 'success');
+        return;
+      }
+
+      const rowLockBtn = target.closest('[data-toggle-row-lock]');
+      if (rowLockBtn && activeCat.type === 'bolts' && canLockToggle()) {
+        const bolt = activeCat.items.find(b => b.id === rowLockBtn.dataset.toggleRowLock);
+        if (bolt) {
+          bolt.locked = !bolt.locked;
+          if (bolt.locked && editingRowId === bolt.id) editingRowId = null;
+          saveState(`${bolt.locked ? 'Locked' : 'Unlocked'} bolt "${bolt.name}" on ${engine.name}`);
+          renderAll();
+          showToast(`"${bolt.name}" ${bolt.locked ? 'locked' : 'unlocked'}`, bolt.locked ? 'warn' : 'success');
+        }
+        return;
+      }
+
+      const editBoltBtn = target.closest('[data-edit-bolt]');
+      if (editBoltBtn && activeCat.type === 'bolts') {
+        const bolt = activeCat.items.find(b => b.id === editBoltBtn.dataset.editBolt);
+        if (bolt && canEditBoltRow(activeCat, bolt)) {
+          editingRowId = bolt.id;
+          renderWorkspace();
+          lucide.createIcons({ root: mainEl });
+        }
+        return;
+      }
+
+      if (target.closest('[data-cancel-bolt]')) {
+        editingRowId = null;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      const saveBoltBtn = target.closest('[data-save-bolt]');
+      if (saveBoltBtn && activeCat.type === 'bolts') {
+        const bid = saveBoltBtn.dataset.saveBolt;
+        const bolt = activeCat.items.find(b => b.id === bid);
+        if (bolt && canEditBoltRow(activeCat, bolt)) {
+          const name = document.getElementById(`editBoltName_${bid}`).value.trim();
+          const size = document.getElementById(`editBoltSize_${bid}`).value.trim();
+          const qty = parseInt(document.getElementById(`editBoltQty_${bid}`).value, 10) || 1;
+          const washer = document.getElementById(`editBoltWasher_${bid}`).value;
+          if (!name || !size) return showToast('Bolt name and size are required', 'error');
+          bolt.name = name;
+          bolt.size = size;
+          bolt.qty = qty;
+          bolt.washer = washer;
+          editingRowId = null;
+          saveState(`Updated "${name}" in ${activeCat.name} on ${engine.name}`);
+          renderAll();
+          showToast('Fastener updated system-wide');
+        }
+        return;
+      }
+
+      const delBoltBtn = target.closest('[data-delete-bolt]');
+      if (delBoltBtn && activeCat.type === 'bolts') {
+        const bid = delBoltBtn.dataset.deleteBolt;
+        const bolt = activeCat.items.find(b => b.id === bid);
+        if (bolt && canEditBoltRow(activeCat, bolt)) {
+          activeCat.items = activeCat.items.filter(b => b.id !== bid);
+          saveState(`Removed "${bolt.name}" from ${activeCat.name} on ${engine.name}`);
+          renderAll();
+          showToast(`Removed ${bolt.name}`);
+        }
+        return;
+      }
+
+      const elecLockBtn = target.closest('[data-toggle-elec-lock]');
+      if (elecLockBtn && activeCat.type === 'electrical' && canLockToggle()) {
+        const item = activeCat.items.find(x => x.id === elecLockBtn.dataset.toggleElecLock);
+        if (item) {
+          item.locked = !item.locked;
+          if (item.locked && editingRowId === item.id) editingRowId = null;
+          saveState(`${item.locked ? 'Locked' : 'Unlocked'} electrical spec "${item.component}" on ${engine.name}`);
+          renderAll();
+          showToast(`"${item.component}" ${item.locked ? 'locked' : 'unlocked'}`, item.locked ? 'warn' : 'success');
+        }
+        return;
+      }
+
+      const editElecBtn = target.closest('[data-edit-elec]');
+      if (editElecBtn && activeCat.type === 'electrical' && canEditContent()) {
+        editingRowId = editElecBtn.dataset.editElec;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      if (target.closest('[data-cancel-elec]')) {
+        editingRowId = null;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      const saveElecBtn = target.closest('[data-save-elec]');
+      if (saveElecBtn && activeCat.type === 'electrical' && canEditContent()) {
+        const eid = saveElecBtn.dataset.saveElec;
+        const item = activeCat.items.find(x => x.id === eid);
+        if (item && !item.locked) {
+          const component = document.getElementById(`editElecComp_${eid}`).value.trim();
+          const spec = document.getElementById(`editElecSpec_${eid}`).value.trim();
+          const connector = document.getElementById(`editElecConn_${eid}`).value.trim();
+          const notes = document.getElementById(`editElecNotes_${eid}`).value.trim();
+          if (!component || !spec) return showToast('Component and spec are required', 'error');
+          item.component = component;
+          item.spec = spec;
+          item.connector = connector;
+          item.notes = notes;
+          editingRowId = null;
+          saveState(`Updated electrical spec "${component}" on ${engine.name}`);
+          renderAll();
+          showToast('Electrical spec updated');
+        }
+        return;
+      }
+
+      const delElecBtn = target.closest('[data-delete-elec]');
+      if (delElecBtn && activeCat.type === 'electrical' && canEditContent()) {
+        const eid = delElecBtn.dataset.deleteElec;
+        const item = activeCat.items.find(x => x.id === eid);
+        if (item && !item.locked) {
+          activeCat.items = activeCat.items.filter(x => x.id !== eid);
+          saveState(`Removed electrical spec "${item.component}" from ${engine.name}`);
+          renderAll();
+          showToast(`Removed ${item.component}`);
+        }
+        return;
+      }
+
+      if (target.closest('#toggleAddIssueBtn')) return document.getElementById('addIssueForm').classList.toggle('hidden');
+      if (target.closest('#cancelAddIssueBtn')) return document.getElementById('addIssueForm').classList.add('hidden');
+
+      const editIssueBtn = target.closest('[data-edit-issue]');
+      if (editIssueBtn && activeCat.type === 'issues' && canEditContent()) {
+        editingRowId = editIssueBtn.dataset.editIssue;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      if (target.closest('[data-cancel-issue]')) {
+        editingRowId = null;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      const saveIssueBtn = target.closest('[data-save-issue]');
+      if (saveIssueBtn && activeCat.type === 'issues' && canEditContent()) {
+        const iid = saveIssueBtn.dataset.saveIssue;
+        const iss = activeCat.items.find(x => x.id === iid);
+        if (iss) {
+          const title = document.getElementById(`editIssueTitle_${iid}`).value.trim();
+          const status = document.getElementById(`editIssueStatus_${iid}`).value;
+          const symptom = document.getElementById(`editIssueSymptom_${iid}`).value.trim();
+          const fix = document.getElementById(`editIssueFix_${iid}`).value.trim();
+          if (!title || !symptom || !fix) return showToast('All fields are required', 'error');
+          iss.title = title;
+          iss.status = status;
+          iss.symptom = symptom;
+          iss.fix = fix;
+          editingRowId = null;
+          saveState(`Updated issue "${title}" on ${engine.name}`);
+          renderAll();
+          showToast('Issue & fix updated');
+        }
+        return;
+      }
+
+      const delIssueBtn = target.closest('[data-delete-issue]');
+      if (delIssueBtn && activeCat.type === 'issues' && isAdmin()) {
+        const iid = delIssueBtn.dataset.deleteIssue;
+        const iss = activeCat.items.find(x => x.id === iid);
+        if (iss) {
+          activeCat.items = activeCat.items.filter(x => x.id !== iid);
+          saveState(`Deleted issue "${iss.title}" from ${engine.name}`);
+          renderAll();
+          showToast('Issue deleted');
+        }
+        return;
+      }
+
+      if (target.closest('#toggleAddNoteBtn')) return document.getElementById('addQualityNoteForm').classList.toggle('hidden');
+      if (target.closest('#cancelAddNoteBtn')) return document.getElementById('addQualityNoteForm').classList.add('hidden');
+
+      const editNoteBtn = target.closest('[data-edit-note]');
+      if (editNoteBtn && activeCat.type === 'notes' && canEditContent()) {
+        editingRowId = editNoteBtn.dataset.editNote;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      if (target.closest('[data-cancel-note]')) {
+        editingRowId = null;
+        renderWorkspace();
+        lucide.createIcons({ root: mainEl });
+        return;
+      }
+
+      const saveNoteBtn = target.closest('[data-save-note]');
+      if (saveNoteBtn && activeCat.type === 'notes' && canEditContent()) {
+        const nid = saveNoteBtn.dataset.saveNote;
+        const note = activeCat.items.find(n => n.id === nid);
+        if (note) {
+          const title = document.getElementById(`editNoteTitle_${nid}`).value.trim();
+          const tag = document.getElementById(`editNoteTag_${nid}`).value;
+          const body = document.getElementById(`editNoteBody_${nid}`).value.trim();
+          if (!title || !body) return showToast('Title and details are required', 'error');
+          const nowStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          note.title = title;
+          note.tag = tag;
+          note.body = body;
+          note.author = getCurrentUser().name;
+          note.timestamp = 'Today, ' + nowStr;
+          editingRowId = null;
+          saveState(`Updated "${title}" in ${activeCat.name} on ${engine.name}`);
+          renderAll();
+          showToast('Specification updated system-wide');
+        }
+        return;
+      }
+
+      const delNoteBtn = target.closest('[data-delete-note]');
+      if (delNoteBtn && activeCat.type === 'notes' && isAdmin()) {
+        const nid = delNoteBtn.dataset.deleteNote;
+        const note = activeCat.items.find(n => n.id === nid);
+        if (note) {
+          activeCat.items = activeCat.items.filter(n => n.id !== nid);
+          saveState(`Deleted "${note.title}" from ${activeCat.name} on ${engine.name}`);
+          renderAll();
+          showToast('Specification deleted');
+        }
+        return;
+      }
+
+      const delPhotoBtn = target.closest('[data-delete-photo]');
+      if (delPhotoBtn && activeCat.type === 'photos' && canEditContent()) {
+        const pid = delPhotoBtn.dataset.deletePhoto;
+        const photo = activeCat.items.find(p => p.id === pid);
+        if (photo) {
+          activeCat.items = activeCat.items.filter(p => p.id !== pid);
+          saveState(`Deleted photo "${photo.caption}" from ${engine.name}`);
+          renderAll();
+          showToast('Photo removed');
+        }
+      }
+    });
+
+    // Optional Cloud Sync Init (Active when FIREBASE_CONFIG.apiKey is set)
+    let cloudAuth = null;
+    let cloudDb = null;
+    if (FIREBASE_CONFIG.apiKey && window.firebase) {
+      try {
+        if (!firebase.apps.length) firebase.initializeApp(FIREBASE_CONFIG);
+        cloudAuth = firebase.auth();
+        cloudDb = firebase.firestore();
+        cloudDb.collection('shop').doc('enginespec').onSnapshot((doc) => {
+          if (doc.exists) {
+            const d = doc.data();
+            if (Array.isArray(d.engines)) state.engines = d.engines;
+            if (Array.isArray(d.users)) state.users = d.users;
+            if (Array.isArray(d.auditLog)) state.auditLog = d.auditLog;
+            if (d.adminPin) state.adminPin = d.adminPin;
+            renderAll();
+          }
+        });
+        cloudAuth.onAuthStateChanged((fbUser) => {
+          if (!fbUser || !fbUser.email) return;
+          const email = fbUser.email.toLowerCase();
+          let u = state.users.find(x => (x.email || '').toLowerCase() === email);
+          if (!u) {
+            const isOwner = ADMIN_EMAIL && email === ADMIN_EMAIL.trim().toLowerCase();
+            u = {
+              id: 'u_' + fbUser.uid,
+              name: fbUser.displayName || email.split('@')[0],
+              email,
+              provider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'google' : 'email',
+              role: isOwner ? 'admin' : 'viewer'
+            };
+            state.users.push(u);
+            saveState(`${u.name} (${email}) joined — assigned ${ROLE_META[u.role].label} access`);
+          }
+          state.currentUserId = u.id;
+          renderAll();
+        });
+      } catch (err) {}
+    }
+
+    // Initial Render
+    renderAll();
+  </script>
+</body>
+</html>
